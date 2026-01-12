@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Custom styles for Michael's Math Gymnasium */
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Touch-friendly sizing for tablet */
+@media (pointer: coarse) {
+  button, input, select {
+    min-height: 44px;
+  }
+}
