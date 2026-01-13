@@ -175,7 +175,7 @@ export function PlayPage() {
         </div>
 
         {/* Scratchpad */}
-        <div className="flex-1 min-h-[200px]">
+        <div className="h-[400px]">
           <Scratchpad disabled={feedback.show || isGenerating} />
         </div>
 
