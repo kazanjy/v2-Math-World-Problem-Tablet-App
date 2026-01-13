@@ -63,10 +63,25 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
 
   // Check if stylus eraser button is pressed (barrel button)
   const isEraserButton = useCallback((e: React.PointerEvent | PointerEvent): boolean => {
-    // Button 5 is the eraser button on many styluses
-    // Also check buttons bitmask - bit 5 (value 32) indicates eraser
-    // Some devices report eraser as a separate pointerType
-    return e.button === 5 || (e.buttons & 32) !== 0 || e.pointerType === 'eraser';
+    // Debug logging to help diagnose stylus events
+    if (e.pointerType === 'pen') {
+      console.log('Stylus event:', {
+        button: e.button,
+        buttons: e.buttons,
+        pointerType: e.pointerType,
+        pressure: e.pressure,
+      });
+    }
+
+    // Android S Pen and most tablet styluses:
+    // - Barrel button press: button === 2 (on pointerdown) or buttons & 2 (during move)
+    // - Some devices use button === 5 or buttons & 32
+    // - Eraser end of stylus: pointerType === 'eraser' (rare)
+    const isBarrelButton = e.button === 2 || (e.buttons & 2) !== 0;
+    const isEraserType = e.pointerType === 'eraser';
+    const isButton5 = e.button === 5 || (e.buttons & 32) !== 0;
+
+    return isBarrelButton || isEraserType || isButton5;
   }, []);
 
   const startDrawing = useCallback((e: React.PointerEvent) => {
@@ -148,8 +163,11 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     const handlePointerMove = (e: PointerEvent) => {
       if (!isDrawing || disabled || !context || !lastPointRef.current) return;
 
-      // Check for eraser button
-      const erasing = e.button === 5 || (e.buttons & 32) !== 0 || e.pointerType === 'eraser';
+      // Check for eraser button (Android barrel button is button 2 / buttons & 2)
+      const isBarrelButton = e.button === 2 || (e.buttons & 2) !== 0;
+      const isEraserType = e.pointerType === 'eraser';
+      const isButton5 = e.button === 5 || (e.buttons & 32) !== 0;
+      const erasing = isBarrelButton || isEraserType || isButton5;
       if (erasing) {
         context.globalCompositeOperation = 'destination-out';
         context.lineWidth = 20;
@@ -211,6 +229,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
           onPointerMove={draw}
           onPointerUp={stopDrawing}
           onPointerLeave={stopDrawing}
+          onContextMenu={(e) => e.preventDefault()}
           className={`w-full h-full ${disabled ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
           style={{
             touchAction: 'none',
