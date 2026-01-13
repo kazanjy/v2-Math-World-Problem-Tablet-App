@@ -214,5 +214,14 @@ export function normalizeAnswer(answer: string): string {
 }
 
 export function checkAnswer(userAnswer: string, correctAnswer: string): boolean {
-  return normalizeAnswer(userAnswer) === normalizeAnswer(correctAnswer);
+  const normalizedUser = normalizeAnswer(userAnswer);
+  const normalizedCorrect = normalizeAnswer(correctAnswer);
+  console.log('Answer comparison:', {
+    userAnswer,
+    correctAnswer,
+    normalizedUser,
+    normalizedCorrect,
+    isEqual: normalizedUser === normalizedCorrect,
+  });
+  return normalizedUser === normalizedCorrect;
 }
