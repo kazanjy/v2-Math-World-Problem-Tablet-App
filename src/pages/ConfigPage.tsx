@@ -252,24 +252,27 @@ export function ConfigPage() {
                           {DIFFICULTIES.map((diff) => {
                             const isEnabled = topicDifficulties[topic]?.includes(diff);
                             return (
-                              <button
-                                key={diff}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleTopicDifficulty(topic, diff);
-                                }}
-                                title={DIFFICULTY_FULL_LABELS[diff]}
-                                className={`px-2 py-1 text-xs font-bold rounded transition-all ${
-                                  isEnabled
-                                    ? diff === 'easy' ? 'bg-green-500 text-white' :
-                                      diff === 'medium' ? 'bg-yellow-500 text-white' :
-                                      diff === 'hard' ? 'bg-orange-500 text-white' :
-                                      'bg-red-500 text-white'
-                                    : 'bg-gray-200 text-gray-400'
-                                }`}
-                              >
-                                {DIFFICULTY_LABELS[diff]}
-                              </button>
+                              <div key={diff} className="relative group">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleTopicDifficulty(topic, diff);
+                                  }}
+                                  className={`px-2 py-1 text-xs font-bold rounded transition-all ${
+                                    isEnabled
+                                      ? diff === 'easy' ? 'bg-green-500 text-white' :
+                                        diff === 'medium' ? 'bg-yellow-500 text-white' :
+                                        diff === 'hard' ? 'bg-orange-500 text-white' :
+                                        'bg-red-500 text-white'
+                                      : 'bg-gray-200 text-gray-400'
+                                  }`}
+                                >
+                                  {DIFFICULTY_LABELS[diff]}
+                                </button>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                  {DIFFICULTY_FULL_LABELS[diff]}
+                                </div>
+                              </div>
                             );
                           })}
                         </div>
