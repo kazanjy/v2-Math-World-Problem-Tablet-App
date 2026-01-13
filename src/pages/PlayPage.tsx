@@ -9,6 +9,7 @@ import { getKeypadConfig } from '../types';
 interface FeedbackState {
   show: boolean;
   isCorrect: boolean;
+  userAnswer: string;
   correctAnswer: string;
   explanation: string;
   genre: string;
@@ -36,6 +37,7 @@ export function PlayPage() {
   const [feedback, setFeedback] = useState<FeedbackState>({
     show: false,
     isCorrect: false,
+    userAnswer: '',
     correctAnswer: '',
     explanation: '',
     genre: '',
@@ -91,6 +93,7 @@ export function PlayPage() {
     setFeedback({
       show: true,
       isCorrect: result.isCorrect,
+      userAnswer: answer,
       correctAnswer: result.correctAnswer,
       explanation: result.explanation,
       genre: result.genre,
@@ -102,7 +105,7 @@ export function PlayPage() {
   }, [answer, submitAnswer, isSubmitting]);
 
   const handleNext = useCallback(async () => {
-    setFeedback({ show: false, isCorrect: false, correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '' });
+    setFeedback({ show: false, isCorrect: false, userAnswer: '', correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '' });
     setAnswer('');
 
     // Clear the scratchpad for the new question
@@ -200,13 +203,15 @@ export function PlayPage() {
               <span className="text-3xl">{feedback.isCorrect ? '🎉' : '😅'}</span>
               <div>
                 <h3 className={`font-bold text-lg ${feedback.isCorrect ? 'text-green-700' : 'text-red-700'}`}>
-                  {feedback.isCorrect ? 'Correct!' : 'Not quite...'}
+                  {feedback.isCorrect ? 'Correct!' : 'Not quite!'}
                 </h3>
-                {!feedback.isCorrect && (
-                  <p className="text-gray-600">
-                    The answer was: <strong>{feedback.correctAnswer}</strong>
-                  </p>
-                )}
+                <p className="text-gray-600">
+                  {feedback.isCorrect ? (
+                    <>You answered <strong>{feedback.userAnswer}</strong> which was right!</>
+                  ) : (
+                    <>You answered <strong>{feedback.userAnswer}</strong>, but the right answer was <strong>{feedback.correctAnswer}</strong>.</>
+                  )}
+                </p>
               </div>
             </div>
 
