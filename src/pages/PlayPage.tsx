@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSessionStore } from '../stores/sessionStore';
 import { NumericKeypad } from '../components/NumericKeypad';
 import { Scratchpad } from '../components/Scratchpad';
+import type { ScratchpadHandle } from '../components/Scratchpad';
 import { getKeypadConfig } from '../types';
 
 interface FeedbackState {
@@ -31,6 +32,7 @@ export function PlayPage() {
   } = useSessionStore();
 
   const [answer, setAnswer] = useState('');
+  const scratchpadRef = useRef<ScratchpadHandle>(null);
   const [feedback, setFeedback] = useState<FeedbackState>({
     show: false,
     isCorrect: false,
@@ -102,6 +104,9 @@ export function PlayPage() {
   const handleNext = useCallback(async () => {
     setFeedback({ show: false, isCorrect: false, correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '' });
     setAnswer('');
+
+    // Clear the scratchpad for the new question
+    scratchpadRef.current?.clear();
 
     // Check if session should end
     const { config, questions } = useSessionStore.getState();
@@ -185,7 +190,7 @@ export function PlayPage() {
 
         {/* Scratchpad */}
         <div className="h-[400px]">
-          <Scratchpad disabled={feedback.show || isGenerating} />
+          <Scratchpad ref={scratchpadRef} disabled={feedback.show || isGenerating} />
         </div>
 
         {/* Feedback or Keypad */}
