@@ -12,7 +12,10 @@ const PRESET_TIME_OPTIONS = [5, 10, 15];
 export function ConfigPage() {
   const navigate = useNavigate();
   const { profile, logout } = useAuthStore();
-  const { setConfig, startSession, isLoading } = useSessionStore();
+  const { setConfig, startSession } = useSessionStore();
+
+  // Local loading state for the entire startup process
+  const [isStarting, setIsStarting] = useState(false);
 
   // Form state
   const [theme, setTheme] = useState<Theme>('standard');
@@ -42,36 +45,42 @@ export function ConfigPage() {
   }, []);
 
   const handleStart = async () => {
-    // Save settings for next time
-    saveSettings({
-      theme,
-      customTheme,
-      gradeLevel,
-      sessionType,
-      questionCount,
-      customQuestionCount,
-      timeMinutes,
-      customTime,
-      mode,
-    });
+    setIsStarting(true);
 
-    const config = {
-      theme,
-      customTheme: theme === 'custom' ? customTheme : undefined,
-      gradeLevel,
-      sessionType,
-      questionCount: sessionType === 'count'
-        ? (customQuestionCount ? parseInt(customQuestionCount) : questionCount)
-        : undefined,
-      timeMinutes: sessionType === 'timed'
-        ? (customTime ? parseInt(customTime) : timeMinutes)
-        : undefined,
-      mode,
-    };
+    try {
+      // Save settings for next time
+      saveSettings({
+        theme,
+        customTheme,
+        gradeLevel,
+        sessionType,
+        questionCount,
+        customQuestionCount,
+        timeMinutes,
+        customTime,
+        mode,
+      });
 
-    setConfig(config);
-    await startSession(profile!.id);
-    navigate('/play');
+      const config = {
+        theme,
+        customTheme: theme === 'custom' ? customTheme : undefined,
+        gradeLevel,
+        sessionType,
+        questionCount: sessionType === 'count'
+          ? (customQuestionCount ? parseInt(customQuestionCount) : questionCount)
+          : undefined,
+        timeMinutes: sessionType === 'timed'
+          ? (customTime ? parseInt(customTime) : timeMinutes)
+          : undefined,
+        mode,
+      };
+
+      setConfig(config);
+      await startSession(profile!.id);
+      navigate('/play');
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   return (
@@ -286,10 +295,20 @@ export function ConfigPage() {
           {/* Start Button */}
           <button
             onClick={handleStart}
-            disabled={isLoading || (theme === 'custom' && !customTheme.trim())}
+            disabled={isStarting || (theme === 'custom' && !customTheme.trim())}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 px-6 rounded-xl text-xl transition-all shadow-lg hover:shadow-xl"
           >
-            {isLoading ? 'Starting...' : 'Start Training!'}
+            {isStarting ? (
+              <span className="flex items-center justify-center gap-3">
+                <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Generating first question...
+              </span>
+            ) : (
+              'Start Training!'
+            )}
           </button>
         </div>
       </div>
