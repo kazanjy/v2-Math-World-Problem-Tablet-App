@@ -23,11 +23,22 @@ export function LoginPage() {
     if (loginError) {
       setError(loginError.message);
     } else if (isDemoMode) {
-      // In dev mode, login is immediate - redirect to home
+      // In demo mode, login is immediate - redirect to home
       navigate('/');
     } else {
       // In production, show "check your email" message
       setSubmitted(true);
+    }
+  };
+
+  const handleDemoMode = async () => {
+    setError(null);
+    const { error: loginError } = await login('Demo User');
+
+    if (loginError) {
+      setError(loginError.message);
+    } else {
+      navigate('/');
     }
   };
 
@@ -63,49 +74,64 @@ export function LoginPage() {
           <p className="text-gray-600 mt-2">Train your brain with fun math problems!</p>
         </div>
 
-        {isDemoMode && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6 text-sm">
-            <strong>Dev Mode:</strong> Supabase not configured. Enter any email to continue.
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              {isDemoMode ? 'Your Name (or Email)' : 'Email Address'}
-            </label>
-            <input
-              type={isDemoMode ? 'text' : 'email'}
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={isDemoMode ? 'Michael' : 'michael@example.com'}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
-              disabled={isLoading}
-              autoFocus
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors"
-          >
-            {isLoading ? 'Loading...' : isDemoMode ? 'Start Training!' : 'Send Magic Link'}
-          </button>
-        </form>
-
         {!isDemoMode && (
-          <p className="text-center text-gray-500 text-sm mt-6">
-            No password needed! We'll send you a magic link to sign in.
-          </p>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="michael@example.com"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
+                disabled={isLoading}
+                autoFocus
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors"
+            >
+              {isLoading ? 'Loading...' : 'Send Magic Link'}
+            </button>
+
+            <p className="text-center text-gray-500 text-sm">
+              No password needed! We'll send you a magic link to sign in.
+            </p>
+          </form>
         )}
+
+        {/* Demo Mode Button */}
+        <div className={!isDemoMode ? 'mt-6 pt-6 border-t border-gray-200' : ''}>
+          {!isDemoMode && (
+            <p className="text-center text-gray-500 text-sm mb-4">Or try without an account</p>
+          )}
+          <button
+            onClick={handleDemoMode}
+            disabled={isLoading}
+            className={`w-full font-bold py-4 px-6 rounded-lg text-lg transition-colors ${
+              isDemoMode
+                ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white'
+                : 'bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700'
+            }`}
+          >
+            {isLoading ? 'Loading...' : isDemoMode ? 'Start Demo' : 'Try Demo Mode'}
+          </button>
+          <p className="text-center text-gray-400 text-xs mt-2">
+            Demo data is saved locally in your browser
+          </p>
+        </div>
       </div>
     </div>
   );
