@@ -91,6 +91,7 @@ Sub-topic examples by genre:
 - Make the word problem engaging and fun with the ${themeDescription} theme
 - Gradually increase difficulty over time - start with easier problems and progress to harder ones
 - Use varied sub-topics within the genre to ensure variety
+- IMPORTANT: Double-check your math! The "answer" field MUST match the final answer in your "explanation". Verify the calculation is correct before responding.
 ${subTopicGuidance}
 Respond in JSON format exactly like this:
 {
@@ -108,6 +109,7 @@ Respond in JSON format exactly like this:
 - The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")
 - Make the word problem engaging and fun with the ${themeDescription} theme
 - Use varied sub-topics to ensure variety
+- IMPORTANT: Double-check your math! The "answer" field MUST match the final answer in your "explanation". Verify the calculation is correct before responding.
 ${subTopicGuidance}
 Respond in JSON format exactly like this:
 {
@@ -126,7 +128,7 @@ Respond in JSON format exactly like this:
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful math teacher creating engaging word problems for students. Always respond with valid JSON.',
+          content: 'You are a helpful math teacher creating engaging word problems for students. Always respond with valid JSON. CRITICAL: Before responding, verify that your "answer" field contains the EXACT same value that your "explanation" concludes with. Double-check your math.',
         },
         {
           role: 'user',
