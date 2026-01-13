@@ -68,19 +68,37 @@ Generate a DIFFERENT type of math problem (different operation or concept).
 `;
   }
 
+  // Sub-topic taxonomy guidance for the AI
+  const subTopicGuidance = `
+Sub-topic examples by genre:
+- addition: "single-digit", "double-digit-no-carrying", "double-digit-with-carrying", "adding-three-numbers", "adding-money"
+- subtraction: "single-digit", "double-digit-no-borrowing", "double-digit-with-borrowing", "subtracting-across-zeros", "subtracting-money"
+- multiplication: "times-tables", "single-by-double-digit", "double-by-double-digit", "multiplying-by-10-100-1000", "multiplying-decimals"
+- division: "basic-division-facts", "division-with-remainders", "long-division", "dividing-by-10-100-1000", "dividing-decimals"
+- fractions: "identifying-fractions", "equivalent-fractions", "comparing-fractions", "adding-same-denominator", "adding-different-denominators", "subtracting-fractions", "multiplying-fractions", "dividing-fractions", "mixed-numbers", "fraction-of-whole"
+- decimals: "place-value", "comparing-decimals", "adding-decimals", "subtracting-decimals", "multiplying-decimals", "dividing-decimals", "decimal-fraction-conversion"
+- percentages: "percent-of-number", "fraction-decimal-percent-conversion", "percent-increase-decrease", "discounts-sales-tax", "tips-gratuity"
+- word-problems: "money-problems", "time-distance-rate", "measurement", "comparison", "multi-step"
+- pre-algebra: "order-of-operations", "variables-expressions", "one-step-equations", "inequalities", "negative-numbers", "absolute-value", "ratios-proportions"
+- algebra: "two-step-equations", "multi-step-equations", "systems-of-equations", "polynomials", "factoring", "quadratics"
+- geometry: "shape-properties", "perimeter", "area-rectangles", "area-triangles-circles", "volume", "angles", "pythagorean-theorem", "coordinate-geometry"
+`;
+
   if (isTopicMode) {
     prompt += `Requirements:
 - Focus on one of these topics: ${topics!.join(', ')}
 - The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")
 - Make the word problem engaging and fun with the ${themeDescription} theme
 - Gradually increase difficulty over time - start with easier problems and progress to harder ones
-
+- Use varied sub-topics within the genre to ensure variety
+${subTopicGuidance}
 Respond in JSON format exactly like this:
 {
   "question": "The word problem text",
   "answer": "The numeric answer (number only, e.g., '42' or '3.5' or '3/4')",
   "explanation": "Step-by-step solution explanation showing how to solve it",
   "genre": "The specific math concept being tested (e.g., 'addition', 'subtraction', 'multiplication', 'division', 'fractions', 'decimals', 'percentages', 'pre-algebra', 'algebra', 'geometry', 'word-problems')",
+  "subTopic": "The specific sub-topic within the genre (e.g., 'double-digit-with-carrying', 'adding-different-denominators', 'percent-of-number')",
   "difficulty": "The difficulty level of this problem: 'easy', 'medium', 'hard', or 'super-hard'"
 }`;
   } else {
@@ -89,13 +107,15 @@ Respond in JSON format exactly like this:
 - The problem should be appropriate for ${gradeDescription} students
 - The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")
 - Make the word problem engaging and fun with the ${themeDescription} theme
-
+- Use varied sub-topics to ensure variety
+${subTopicGuidance}
 Respond in JSON format exactly like this:
 {
   "question": "The word problem text",
   "answer": "The numeric answer (number only, e.g., '42' or '3.5' or '3/4')",
   "explanation": "Step-by-step solution explanation showing how to solve it",
-  "genre": "The math concept being tested (e.g., 'addition', 'subtraction', 'multiplication', 'division', 'fractions', 'percentages', 'word-problem-distance', 'word-problem-money')",
+  "genre": "The math concept being tested (e.g., 'addition', 'subtraction', 'multiplication', 'division', 'fractions', 'percentages', 'word-problems')",
+  "subTopic": "The specific sub-topic within the genre (e.g., 'double-digit-with-carrying', 'adding-different-denominators', 'money-problems')",
   "difficulty": "The difficulty level of this problem: 'easy', 'medium', 'hard', or 'super-hard'"
 }`;
   }
@@ -135,6 +155,11 @@ Respond in JSON format exactly like this:
       parsed.difficulty = 'medium'; // Default to medium if invalid
     }
 
+    // Default subTopic if not provided
+    if (!parsed.subTopic) {
+      parsed.subTopic = 'general';
+    }
+
     return parsed;
   } catch (error) {
     console.error('Error generating question:', error);
@@ -144,6 +169,7 @@ Respond in JSON format exactly like this:
       answer: '8',
       explanation: 'Start with 5, add 3 more. 5 + 3 = 8.',
       genre: 'addition',
+      subTopic: 'single-digit',
       difficulty: 'easy',
     };
   }

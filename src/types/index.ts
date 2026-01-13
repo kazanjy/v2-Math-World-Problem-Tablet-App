@@ -92,6 +92,7 @@ export interface GeneratedQuestion {
   answer: string;
   explanation: string;
   genre: string;
+  subTopic: string;
   difficulty: Difficulty;
 }
 
@@ -103,6 +104,7 @@ export interface Question {
   correctAnswer: string;
   explanation: string;
   genre: string;
+  subTopic: string;
   difficulty: Difficulty;
   userAnswer?: string;
   isCorrect?: boolean;

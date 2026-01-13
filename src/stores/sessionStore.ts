@@ -55,7 +55,7 @@ interface SessionState {
   setConfig: (config: SessionConfig) => void;
   startSession: (userId: string) => Promise<void>;
   nextQuestion: () => Promise<void>;
-  submitAnswer: (userAnswer: string) => Promise<{ isCorrect: boolean; correctAnswer: string; explanation: string; genre: string; difficulty: string }>;
+  submitAnswer: (userAnswer: string) => Promise<{ isCorrect: boolean; correctAnswer: string; explanation: string; genre: string; subTopic: string; difficulty: string }>;
   endSession: () => Promise<void>;
   tick: () => void; // For timer
   reset: () => void;
@@ -176,6 +176,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           correctAnswer: generated.answer,
           explanation: generated.explanation,
           genre: generated.genre,
+          subTopic: generated.subTopic,
           difficulty: generated.difficulty,
           questionOrder: nextNumber,
         });
@@ -190,6 +191,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           correctAnswer: generated.answer,
           explanation: generated.explanation,
           genre: generated.genre,
+          subTopic: generated.subTopic,
           difficulty: generated.difficulty,
           questionOrder: nextNumber,
           createdAt: new Date(),
@@ -215,7 +217,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   submitAnswer: async (userAnswer: string) => {
     const { currentQuestion, session, questions, questionNumber, questionStartTime, retryQueue } = get();
     if (!currentQuestion || !session) {
-      return { isCorrect: false, correctAnswer: '', explanation: '', genre: '', difficulty: '' };
+      return { isCorrect: false, correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '' };
     }
 
     const timeSpent = questionStartTime
@@ -326,6 +328,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       correctAnswer: currentQuestion.correctAnswer,
       explanation: currentQuestion.explanation,
       genre: currentQuestion.genre,
+      subTopic: currentQuestion.subTopic,
       difficulty: currentQuestion.difficulty,
     };
   },
