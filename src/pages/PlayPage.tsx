@@ -196,12 +196,10 @@ export function PlayPage() {
               </div>
             </div>
 
-            {!feedback.isCorrect && (
-              <div className="bg-white rounded-lg p-3 mb-4">
-                <h4 className="font-semibold text-gray-700 mb-1">How to solve it:</h4>
-                <p className="text-gray-600 text-sm">{feedback.explanation}</p>
-              </div>
-            )}
+            <div className="bg-white rounded-lg p-3 mb-4">
+              <h4 className="font-semibold text-gray-700 mb-1">How to solve it:</h4>
+              <p className="text-gray-600 text-sm">{feedback.explanation}</p>
+            </div>
 
             {canContinue ? (
               <button
