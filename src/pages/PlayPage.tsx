@@ -10,6 +10,7 @@ interface FeedbackState {
   isCorrect: boolean;
   correctAnswer: string;
   explanation: string;
+  genre: string;
 }
 
 export function PlayPage() {
@@ -33,6 +34,7 @@ export function PlayPage() {
     isCorrect: false,
     correctAnswer: '',
     explanation: '',
+    genre: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -85,13 +87,14 @@ export function PlayPage() {
       isCorrect: result.isCorrect,
       correctAnswer: result.correctAnswer,
       explanation: result.explanation,
+      genre: result.genre,
     });
 
     setIsSubmitting(false);
   }, [answer, submitAnswer, isSubmitting]);
 
   const handleNext = useCallback(async () => {
-    setFeedback({ show: false, isCorrect: false, correctAnswer: '', explanation: '' });
+    setFeedback({ show: false, isCorrect: false, correctAnswer: '', explanation: '', genre: '' });
     setAnswer('');
 
     // Check if session should end
@@ -197,6 +200,11 @@ export function PlayPage() {
             </div>
 
             <div className="bg-white rounded-lg p-3 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full capitalize">
+                  {feedback.genre.replace(/-/g, ' ')}
+                </span>
+              </div>
               <h4 className="font-semibold text-gray-700 mb-1">How to solve it:</h4>
               <p className="text-gray-600 text-sm">{feedback.explanation}</p>
             </div>
