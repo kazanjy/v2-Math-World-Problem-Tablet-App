@@ -4,8 +4,8 @@ import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { getSavedSettings, saveSettings } from '../lib/localStorage';
 import type { SelectionMode } from '../lib/localStorage';
-import type { Theme, GradeLevel, SessionType, SessionMode, Topic } from '../types';
-import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS } from '../types';
+import type { Theme, GradeLevel, SessionType, SessionMode, Topic, Difficulty, TopicDifficultySettings } from '../types';
+import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS, DIFFICULTIES, DIFFICULTY_LABELS, DIFFICULTY_FULL_LABELS } from '../types';
 
 const PRESET_QUESTION_COUNTS = [5, 10, 15, 20];
 const PRESET_TIME_OPTIONS = [5, 10, 15];
@@ -24,6 +24,14 @@ export function ConfigPage() {
   const [selectionMode, setSelectionMode] = useState<SelectionMode>('grade');
   const [gradeLevel, setGradeLevel] = useState<GradeLevel>('3');
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [topicDifficulties, setTopicDifficulties] = useState<TopicDifficultySettings>(() => {
+    // Default: all difficulties enabled for all topics
+    const defaults: TopicDifficultySettings = {} as TopicDifficultySettings;
+    TOPICS.forEach(topic => {
+      defaults[topic] = ['easy', 'medium', 'hard', 'super-hard'];
+    });
+    return defaults;
+  });
   const [sessionType, setSessionType] = useState<SessionType>('count');
   const [questionCount, setQuestionCount] = useState(10);
   const [customQuestionCount, setCustomQuestionCount] = useState('');
@@ -40,6 +48,9 @@ export function ConfigPage() {
       setSelectionMode(saved.selectionMode || 'grade');
       setGradeLevel(saved.gradeLevel);
       setTopics(saved.topics || []);
+      if (saved.topicDifficulties) {
+        setTopicDifficulties(saved.topicDifficulties);
+      }
       setSessionType(saved.sessionType);
       setQuestionCount(saved.questionCount);
       setCustomQuestionCount(saved.customQuestionCount);
@@ -58,6 +69,21 @@ export function ConfigPage() {
     );
   };
 
+  // Toggle a difficulty for a specific topic
+  const toggleTopicDifficulty = (topic: Topic, difficulty: Difficulty) => {
+    setTopicDifficulties(prev => {
+      const current = prev[topic] || [];
+      const newDifficulties = current.includes(difficulty)
+        ? current.filter(d => d !== difficulty)
+        : [...current, difficulty];
+      // Ensure at least one difficulty is selected
+      if (newDifficulties.length === 0) {
+        return prev; // Don't allow removing the last difficulty
+      }
+      return { ...prev, [topic]: newDifficulties };
+    });
+  };
+
   const handleStart = async () => {
     setIsStarting(true);
 
@@ -69,6 +95,7 @@ export function ConfigPage() {
         selectionMode,
         gradeLevel,
         topics,
+        topicDifficulties,
         sessionType,
         questionCount,
         customQuestionCount,
@@ -83,6 +110,7 @@ export function ConfigPage() {
         // Only include gradeLevel if in grade mode, only include topics if in topics mode
         gradeLevel: selectionMode === 'grade' ? gradeLevel : undefined,
         topics: selectionMode === 'topics' ? topics : undefined,
+        topicDifficulties: selectionMode === 'topics' ? topicDifficulties : undefined,
         sessionType,
         questionCount: sessionType === 'count'
           ? (customQuestionCount ? parseInt(customQuestionCount) : questionCount)
@@ -201,19 +229,52 @@ export function ConfigPage() {
             {/* Topics Selection */}
             {selectionMode === 'topics' && (
               <div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="space-y-2">
                   {TOPICS.map((topic) => (
-                    <button
+                    <div
                       key={topic}
-                      onClick={() => toggleTopic(topic)}
-                      className={`px-4 py-3 rounded-lg border-2 transition-all text-left ${
+                      className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all ${
                         topics.includes(topic)
-                          ? 'border-purple-500 bg-purple-50 text-purple-700'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200'
                       }`}
                     >
-                      {TOPIC_LABELS[topic]}
-                    </button>
+                      <button
+                        onClick={() => toggleTopic(topic)}
+                        className={`flex-1 text-left font-medium ${
+                          topics.includes(topic) ? 'text-purple-700' : 'text-gray-600'
+                        }`}
+                      >
+                        {TOPIC_LABELS[topic]}
+                      </button>
+                      {topics.includes(topic) && (
+                        <div className="flex gap-1">
+                          {DIFFICULTIES.map((diff) => {
+                            const isEnabled = topicDifficulties[topic]?.includes(diff);
+                            return (
+                              <button
+                                key={diff}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleTopicDifficulty(topic, diff);
+                                }}
+                                title={DIFFICULTY_FULL_LABELS[diff]}
+                                className={`px-2 py-1 text-xs font-bold rounded transition-all ${
+                                  isEnabled
+                                    ? diff === 'easy' ? 'bg-green-500 text-white' :
+                                      diff === 'medium' ? 'bg-yellow-500 text-white' :
+                                      diff === 'hard' ? 'bg-orange-500 text-white' :
+                                      'bg-red-500 text-white'
+                                    : 'bg-gray-200 text-gray-400'
+                                }`}
+                              >
+                                {DIFFICULTY_LABELS[diff]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
                 {topics.length === 0 && (

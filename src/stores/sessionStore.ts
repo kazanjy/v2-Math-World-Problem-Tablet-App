@@ -161,6 +161,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         customTheme: config.customTheme,
         gradeLevel: config.gradeLevel,
         topics: config.topics,
+        topicDifficulties: config.topicDifficulties,
         previousQuestion,
         isRetry,
         retryGenre: retryItem?.genre,

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
-import type { GradeLevel, Theme, Topic, GeneratedQuestion, Difficulty } from '../types';
+import type { GradeLevel, Theme, Topic, GeneratedQuestion, Difficulty, TopicDifficultySettings } from '../types';
+import { DIFFICULTY_FULL_LABELS } from '../types';
 
 const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -17,13 +18,14 @@ interface GenerateQuestionParams {
   customTheme?: string;
   gradeLevel?: GradeLevel; // Optional - used when not selecting topics
   topics?: Topic[]; // Optional - used when selecting specific topics
+  topicDifficulties?: TopicDifficultySettings; // Difficulty settings per topic
   previousQuestion?: string;
   isRetry?: boolean;
   retryGenre?: string;
 }
 
 export async function generateQuestion(params: GenerateQuestionParams): Promise<GeneratedQuestion> {
-  const { theme, customTheme, gradeLevel, topics, previousQuestion, isRetry, retryGenre } = params;
+  const { theme, customTheme, gradeLevel, topics, topicDifficulties, previousQuestion, isRetry, retryGenre } = params;
 
   const themeDescription = theme === 'custom' && customTheme
     ? customTheme
@@ -39,11 +41,32 @@ export async function generateQuestion(params: GenerateQuestionParams): Promise<
   if (isTopicMode) {
     // Topic-based mode
     const topicList = topics.join(', ');
+
+    // Build difficulty constraints per topic
+    let difficultyConstraints = '';
+    if (topicDifficulties) {
+      const constraints = topics.map(topic => {
+        const difficulties = topicDifficulties[topic];
+        if (difficulties && difficulties.length > 0 && difficulties.length < 4) {
+          const diffLabels = difficulties.map(d => DIFFICULTY_FULL_LABELS[d]).join(', ');
+          return `- ${topic}: only ${diffLabels} difficulty`;
+        }
+        return null;
+      }).filter(Boolean);
+
+      if (constraints.length > 0) {
+        difficultyConstraints = `
+Difficulty constraints by topic:
+${constraints.join('\n')}
+`;
+      }
+    }
+
     prompt = `Generate a math word problem focusing on one of these topics: ${topicList}.
 
 Theme: ${themeDescription}
 ${theme === 'custom' ? `Use this theme for the story context: ${customTheme}` : `Incorporate ${themeDescription} elements into the story.`}
-
+${difficultyConstraints}
 `;
   } else {
     // Grade-based mode

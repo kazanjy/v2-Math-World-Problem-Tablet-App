@@ -68,6 +68,25 @@ export const TOPIC_LABELS: Record<Topic, string> = {
 // Difficulty levels returned by OpenAI
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'super-hard';
 
+export const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard', 'super-hard'];
+
+export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  'easy': 'E',
+  'medium': 'M',
+  'hard': 'H',
+  'super-hard': 'SH',
+};
+
+export const DIFFICULTY_FULL_LABELS: Record<Difficulty, string> = {
+  'easy': 'Easy',
+  'medium': 'Medium',
+  'hard': 'Hard',
+  'super-hard': 'Super Hard',
+};
+
+// Topic difficulty settings - which difficulties are enabled for each topic
+export type TopicDifficultySettings = Record<Topic, Difficulty[]>;
+
 // Session type: fixed number of questions or timed
 export type SessionType = 'count' | 'timed';
 
@@ -80,6 +99,7 @@ export interface SessionConfig {
   customTheme?: string;
   gradeLevel?: GradeLevel; // Optional - used when not selecting topics
   topics?: Topic[]; // Optional - used when selecting specific topics (mutually exclusive with gradeLevel)
+  topicDifficulties?: TopicDifficultySettings; // Difficulty settings per topic
   sessionType: SessionType;
   questionCount?: number;
   timeMinutes?: number;
