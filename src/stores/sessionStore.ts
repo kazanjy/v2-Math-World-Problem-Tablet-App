@@ -10,10 +10,15 @@ import {
   getLocalSessions,
   getLocalSessionQuestions,
 } from '../lib/localStorage';
+import { useAuthStore } from './authStore';
 
-// Check if we're in demo mode
-const isDemoMode = !import.meta.env.VITE_SUPABASE_URL ||
-  import.meta.env.VITE_SUPABASE_URL === 'https://placeholder.supabase.co';
+// Check if we should use local storage (demo mode OR demo login)
+const shouldUseLocalStorage = () => {
+  const isDemoMode = !import.meta.env.VITE_SUPABASE_URL ||
+    import.meta.env.VITE_SUPABASE_URL === 'https://placeholder.supabase.co';
+  const isUsingDemoLogin = useAuthStore.getState().isUsingDemoLogin;
+  return isDemoMode || isUsingDemoLogin;
+};
 
 interface RetryItem {
   genre: string;
@@ -83,7 +88,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     let session: Session | null = null;
 
-    if (!isDemoMode) {
+    if (!shouldUseLocalStorage()) {
       session = await createSession({
         userId,
         theme: config.theme,
@@ -113,7 +118,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       };
 
       // Persist to localStorage in demo mode
-      if (isDemoMode) {
+      if (shouldUseLocalStorage()) {
         saveLocalSession(session);
       }
     }
@@ -161,7 +166,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
       let savedQuestion: Question | null = null;
 
-      if (!isDemoMode) {
+      if (!shouldUseLocalStorage()) {
         // Try Supabase first
         savedQuestion = await saveQuestion({
           sessionId: session.id,
@@ -187,7 +192,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         };
 
         // Persist to localStorage in demo mode
-        if (isDemoMode) {
+        if (shouldUseLocalStorage()) {
           saveLocalQuestion(savedQuestion);
         }
       }
@@ -216,7 +221,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const isCorrect = checkAnswer(userAnswer, currentQuestion.correctAnswer);
 
     // Update question in database or localStorage
-    if (isDemoMode) {
+    if (shouldUseLocalStorage()) {
       updateLocalQuestion(currentQuestion.id, {
         userAnswer,
         isCorrect,
@@ -294,7 +299,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       totalAttempted: newQuestions.length,
     };
 
-    if (isDemoMode) {
+    if (shouldUseLocalStorage()) {
       updateLocalSession(session.id, {
         totalCorrect,
         totalAttempted: newQuestions.length,
@@ -326,7 +331,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const totalCorrect = questions.filter(q => q.isCorrect).length;
     const endedAt = new Date();
 
-    if (isDemoMode) {
+    if (shouldUseLocalStorage()) {
       updateLocalSession(session.id, {
         endedAt,
         totalCorrect,
@@ -379,7 +384,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   // History helpers for demo mode
   getSessionHistory: () => {
-    if (isDemoMode) {
+    if (shouldUseLocalStorage()) {
       return getLocalSessions().sort((a, b) =>
         new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
       );
@@ -388,7 +393,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   getSessionQuestions: (sessionId: string) => {
-    if (isDemoMode) {
+    if (shouldUseLocalStorage()) {
       return getLocalSessionQuestions(sessionId);
     }
     return [];

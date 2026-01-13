@@ -7,7 +7,7 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { login, isLoading, isDemoMode } = useAuthStore();
+  const { login, loginAsDemo, isLoading, isDemoMode } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +33,7 @@ export function LoginPage() {
 
   const handleDemoMode = async () => {
     setError(null);
-    const { error: loginError } = await login('Demo User');
+    const { error: loginError } = await loginAsDemo();
 
     if (loginError) {
       setError(loginError.message);

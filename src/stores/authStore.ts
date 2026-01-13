@@ -14,10 +14,12 @@ interface AuthState {
   isLoading: boolean;
   isInitialized: boolean;
   isDemoMode: boolean;
+  isUsingDemoLogin: boolean;
 
   // Actions
   initialize: () => Promise<void>;
   login: (email: string) => Promise<{ error: Error | null }>;
+  loginAsDemo: () => Promise<{ error: Error | null }>;
   logout: () => Promise<void>;
   clearDemoData: () => void;
 }
@@ -28,6 +30,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
   isInitialized: false,
   isDemoMode,
+  isUsingDemoLogin: false,
 
   initialize: async () => {
     if (isDemoMode) {
@@ -137,12 +140,44 @@ export const useAuthStore = create<AuthState>((set) => ({
     return { error: error ? new Error(error.message) : null };
   },
 
+  loginAsDemo: async () => {
+    set({ isLoading: true });
+
+    const mockUser = {
+      id: `demo-${Date.now()}`,
+      email: 'demo@example.com',
+      aud: 'authenticated',
+      role: 'authenticated',
+      created_at: new Date().toISOString(),
+    } as User;
+
+    const mockProfile: UserProfile = {
+      id: mockUser.id,
+      email: 'demo@example.com',
+      displayName: 'Demo User',
+      createdAt: new Date(),
+    };
+
+    // Save to localStorage for persistence
+    saveLocalProfile(mockProfile);
+
+    set({
+      user: mockUser,
+      profile: mockProfile,
+      isLoading: false,
+      isUsingDemoLogin: true,
+    });
+
+    return { error: null };
+  },
+
   logout: async () => {
     set({ isLoading: true });
 
-    if (isDemoMode) {
-      clearLocalProfile();
-    } else {
+    // Always clear local profile (handles both demo mode and demo login)
+    clearLocalProfile();
+
+    if (!isDemoMode) {
       await signOut();
     }
 
@@ -150,6 +185,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       user: null,
       profile: null,
       isLoading: false,
+      isUsingDemoLogin: false,
     });
   },
 
