@@ -65,7 +65,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     set({ isLoading: true });
 
-    const session = await createSession({
+    let session = await createSession({
       userId,
       theme: config.theme,
       customTheme: config.customTheme,
@@ -75,22 +75,36 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       mode: config.mode,
     });
 
-    if (session) {
-      set({
-        session,
-        startTime: new Date(),
-        timeRemaining: config.sessionType === 'timed' ? config.timeMinutes! * 60 : null,
-        isLoading: false,
-        questions: [],
-        retryQueue: [],
-        questionNumber: 0,
-      });
-
-      // Generate first question
-      await get().nextQuestion();
-    } else {
-      set({ isLoading: false });
+    // Fallback to local session if Supabase is not configured
+    if (!session) {
+      console.warn('Supabase not configured, using local session');
+      session = {
+        id: `local-${Date.now()}`,
+        userId,
+        theme: config.theme,
+        customTheme: config.customTheme,
+        gradeLevel: config.gradeLevel,
+        sessionType: config.sessionType,
+        sessionValue: config.sessionType === 'count' ? config.questionCount! : config.timeMinutes!,
+        mode: config.mode,
+        startedAt: new Date(),
+        totalCorrect: 0,
+        totalAttempted: 0,
+      };
     }
+
+    set({
+      session,
+      startTime: new Date(),
+      timeRemaining: config.sessionType === 'timed' ? config.timeMinutes! * 60 : null,
+      isLoading: false,
+      questions: [],
+      retryQueue: [],
+      questionNumber: 0,
+    });
+
+    // Generate first question
+    await get().nextQuestion();
   },
 
   nextQuestion: async () => {
@@ -121,7 +135,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       });
 
       // Save question to database (without answer yet)
-      const savedQuestion = await saveQuestion({
+      let savedQuestion = await saveQuestion({
         sessionId: session.id,
         questionText: generated.question,
         correctAnswer: generated.answer,
@@ -130,13 +144,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         questionOrder: nextNumber,
       });
 
-      if (savedQuestion) {
-        set({
-          currentQuestion: { ...savedQuestion, generated },
-          questionNumber: nextNumber,
-          isGenerating: false,
-        });
+      // Fallback to local question if Supabase is not configured
+      if (!savedQuestion) {
+        savedQuestion = {
+          id: `local-q-${Date.now()}`,
+          sessionId: session.id,
+          questionText: generated.question,
+          correctAnswer: generated.answer,
+          explanation: generated.explanation,
+          genre: generated.genre,
+          questionOrder: nextNumber,
+          createdAt: new Date(),
+        };
       }
+
+      set({
+        currentQuestion: { ...savedQuestion, generated },
+        questionNumber: nextNumber,
+        isGenerating: false,
+      });
     } catch (error) {
       console.error('Error generating question:', error);
       set({ isGenerating: false });
