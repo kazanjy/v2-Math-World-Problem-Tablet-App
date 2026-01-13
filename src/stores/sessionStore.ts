@@ -55,7 +55,7 @@ interface SessionState {
   setConfig: (config: SessionConfig) => void;
   startSession: (userId: string) => Promise<void>;
   nextQuestion: () => Promise<void>;
-  submitAnswer: (userAnswer: string) => Promise<{ isCorrect: boolean; correctAnswer: string; explanation: string; genre: string; subTopic: string; difficulty: string }>;
+  submitAnswer: (userAnswer: string) => Promise<{ isCorrect: boolean; correctAnswer: string; explanation: string; genre: string; subTopic: string; difficulty: string; timeSpent: number }>;
   endSession: () => Promise<void>;
   tick: () => void; // For timer
   reset: () => void;
@@ -217,7 +217,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   submitAnswer: async (userAnswer: string) => {
     const { currentQuestion, session, questions, questionNumber, questionStartTime, retryQueue } = get();
     if (!currentQuestion || !session) {
-      return { isCorrect: false, correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '' };
+      return { isCorrect: false, correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '', timeSpent: 0 };
     }
 
     const timeSpent = questionStartTime
@@ -330,6 +330,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       genre: currentQuestion.genre,
       subTopic: currentQuestion.subTopic,
       difficulty: currentQuestion.difficulty,
+      timeSpent,
     };
   },
 

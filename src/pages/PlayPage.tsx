@@ -15,6 +15,7 @@ interface FeedbackState {
   genre: string;
   subTopic: string;
   difficulty: string;
+  timeSpent: number;
 }
 
 export function PlayPage() {
@@ -43,6 +44,7 @@ export function PlayPage() {
     genre: '',
     subTopic: '',
     difficulty: '',
+    timeSpent: 0,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -99,13 +101,14 @@ export function PlayPage() {
       genre: result.genre,
       subTopic: result.subTopic,
       difficulty: result.difficulty,
+      timeSpent: result.timeSpent,
     });
 
     setIsSubmitting(false);
   }, [answer, submitAnswer, isSubmitting]);
 
   const handleNext = useCallback(async () => {
-    setFeedback({ show: false, isCorrect: false, userAnswer: '', correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '' });
+    setFeedback({ show: false, isCorrect: false, userAnswer: '', correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '', timeSpent: 0 });
     setAnswer('');
 
     // Clear the scratchpad for the new question
@@ -233,6 +236,13 @@ export function PlayPage() {
                     'text-red-600 bg-red-100'
                   }`}>
                     {feedback.difficulty.replace(/-/g, ' ')}
+                  </span>
+                )}
+                {feedback.timeSpent > 0 && (
+                  <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
+                    {feedback.timeSpent >= 60
+                      ? `${Math.floor(feedback.timeSpent / 60)}m ${feedback.timeSpent % 60}s`
+                      : `${feedback.timeSpent}s`}
                   </span>
                 )}
               </div>
