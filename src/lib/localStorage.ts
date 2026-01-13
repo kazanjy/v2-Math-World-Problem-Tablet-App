@@ -1,9 +1,10 @@
-import type { Session, Question, UserProfile } from '../types';
+import type { Session, Question, UserProfile, Theme, GradeLevel, SessionType, SessionMode } from '../types';
 
 const STORAGE_KEYS = {
   PROFILE: 'mmg_profile',
   SESSIONS: 'mmg_sessions',
   QUESTIONS: 'mmg_questions',
+  SETTINGS: 'mmg_settings',
 };
 
 // Profile helpers
@@ -127,4 +128,27 @@ export function getLocalStats(): { totalSessions: number; totalQuestions: number
     totalQuestions: questions.length,
     totalCorrect,
   };
+}
+
+// Settings helpers
+export interface SavedSettings {
+  theme: Theme;
+  customTheme?: string;
+  gradeLevel: GradeLevel;
+  sessionType: SessionType;
+  questionCount: number;
+  customQuestionCount: string;
+  timeMinutes: number;
+  customTime: string;
+  mode: SessionMode;
+}
+
+export function getSavedSettings(): SavedSettings | null {
+  const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+  if (!data) return null;
+  return JSON.parse(data);
+}
+
+export function saveSettings(settings: SavedSettings): void {
+  localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
 }

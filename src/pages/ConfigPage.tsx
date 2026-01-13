@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
+import { getSavedSettings, saveSettings } from '../lib/localStorage';
 import type { Theme, GradeLevel, SessionType, SessionMode } from '../types';
 import { THEME_LABELS, GRADE_LEVELS } from '../types';
 
@@ -24,7 +25,36 @@ export function ConfigPage() {
   const [customTime, setCustomTime] = useState('');
   const [mode, setMode] = useState<SessionMode>('chill');
 
+  // Load saved settings on mount
+  useEffect(() => {
+    const saved = getSavedSettings();
+    if (saved) {
+      setTheme(saved.theme);
+      setCustomTheme(saved.customTheme || '');
+      setGradeLevel(saved.gradeLevel);
+      setSessionType(saved.sessionType);
+      setQuestionCount(saved.questionCount);
+      setCustomQuestionCount(saved.customQuestionCount);
+      setTimeMinutes(saved.timeMinutes);
+      setCustomTime(saved.customTime);
+      setMode(saved.mode);
+    }
+  }, []);
+
   const handleStart = async () => {
+    // Save settings for next time
+    saveSettings({
+      theme,
+      customTheme,
+      gradeLevel,
+      sessionType,
+      questionCount,
+      customQuestionCount,
+      timeMinutes,
+      customTime,
+      mode,
+    });
+
     const config = {
       theme,
       customTheme: theme === 'custom' ? customTheme : undefined,
