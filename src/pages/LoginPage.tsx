@@ -7,7 +7,7 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { login, isLoading, isDevMode } = useAuthStore();
+  const { login, isLoading, isDemoMode } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +22,7 @@ export function LoginPage() {
 
     if (loginError) {
       setError(loginError.message);
-    } else if (isDevMode) {
+    } else if (isDemoMode) {
       // In dev mode, login is immediate - redirect to home
       navigate('/');
     } else {
@@ -63,7 +63,7 @@ export function LoginPage() {
           <p className="text-gray-600 mt-2">Train your brain with fun math problems!</p>
         </div>
 
-        {isDevMode && (
+        {isDemoMode && (
           <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6 text-sm">
             <strong>Dev Mode:</strong> Supabase not configured. Enter any email to continue.
           </div>
@@ -72,14 +72,14 @@ export function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              {isDevMode ? 'Your Name (or Email)' : 'Email Address'}
+              {isDemoMode ? 'Your Name (or Email)' : 'Email Address'}
             </label>
             <input
-              type={isDevMode ? 'text' : 'email'}
+              type={isDemoMode ? 'text' : 'email'}
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={isDevMode ? 'Michael' : 'michael@example.com'}
+              placeholder={isDemoMode ? 'Michael' : 'michael@example.com'}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
               disabled={isLoading}
               autoFocus
@@ -97,11 +97,11 @@ export function LoginPage() {
             disabled={isLoading}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors"
           >
-            {isLoading ? 'Loading...' : isDevMode ? 'Start Training!' : 'Send Magic Link'}
+            {isLoading ? 'Loading...' : isDemoMode ? 'Start Training!' : 'Send Magic Link'}
           </button>
         </form>
 
-        {!isDevMode && (
+        {!isDemoMode && (
           <p className="text-center text-gray-500 text-sm mt-6">
             No password needed! We'll send you a magic link to sign in.
           </p>

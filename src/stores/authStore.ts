@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import { supabase, getOrCreateProfile, signInWithMagicLink, signOut } from '../lib/supabase';
+import { getLocalProfile, saveLocalProfile, clearLocalProfile, clearAllLocalData } from '../lib/localStorage';
 import type { UserProfile } from '../types';
 import type { User } from '@supabase/supabase-js';
 
-// Check if we're in dev mode (Supabase not configured)
-const isDevMode = !import.meta.env.VITE_SUPABASE_URL ||
+// Check if we're in demo mode (Supabase not configured)
+const isDemoMode = !import.meta.env.VITE_SUPABASE_URL ||
   import.meta.env.VITE_SUPABASE_URL === 'https://placeholder.supabase.co';
 
 interface AuthState {
@@ -12,12 +13,13 @@ interface AuthState {
   profile: UserProfile | null;
   isLoading: boolean;
   isInitialized: boolean;
-  isDevMode: boolean;
+  isDemoMode: boolean;
 
   // Actions
   initialize: () => Promise<void>;
   login: (email: string) => Promise<{ error: Error | null }>;
   logout: () => Promise<void>;
+  clearDemoData: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -25,21 +27,41 @@ export const useAuthStore = create<AuthState>((set) => ({
   profile: null,
   isLoading: true,
   isInitialized: false,
-  isDevMode,
+  isDemoMode,
 
   initialize: async () => {
-    if (isDevMode) {
-      console.warn('Running in dev mode - Supabase not configured');
-      set({
-        user: null,
-        profile: null,
-        isLoading: false,
-        isInitialized: true,
-      });
+    if (isDemoMode) {
+      console.warn('Running in demo mode - Supabase not configured, using localStorage');
+
+      // Check for existing profile in localStorage
+      const existingProfile = getLocalProfile();
+      if (existingProfile) {
+        const mockUser = {
+          id: existingProfile.id,
+          email: existingProfile.email,
+          aud: 'authenticated',
+          role: 'authenticated',
+          created_at: existingProfile.createdAt.toISOString(),
+        } as User;
+
+        set({
+          user: mockUser,
+          profile: existingProfile,
+          isLoading: false,
+          isInitialized: true,
+        });
+      } else {
+        set({
+          user: null,
+          profile: null,
+          isLoading: false,
+          isInitialized: true,
+        });
+      }
       return;
     }
 
-    // Get initial session
+    // Get initial session from Supabase
     const { data: { session } } = await supabase.auth.getSession();
 
     if (session?.user) {
@@ -81,10 +103,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (email: string) => {
     set({ isLoading: true });
 
-    // Dev mode: create mock user
-    if (isDevMode) {
+    // Demo mode: create mock user and save to localStorage
+    if (isDemoMode) {
       const mockUser = {
-        id: `dev-${Date.now()}`,
+        id: `demo-${Date.now()}`,
         email,
         aud: 'authenticated',
         role: 'authenticated',
@@ -97,6 +119,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         displayName: email.split('@')[0],
         createdAt: new Date(),
       };
+
+      // Save to localStorage for persistence
+      saveLocalProfile(mockProfile);
 
       set({
         user: mockUser,
@@ -115,7 +140,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     set({ isLoading: true });
 
-    if (!isDevMode) {
+    if (isDemoMode) {
+      clearLocalProfile();
+    } else {
       await signOut();
     }
 
@@ -125,4 +152,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       isLoading: false,
     });
   },
+
+  clearDemoData: () => {
+    if (isDemoMode) {
+      clearAllLocalData();
+      set({
+        user: null,
+        profile: null,
+      });
+    }
+  },
 }));
+
+// Re-export for backwards compatibility
+export const isDevMode = isDemoMode;

@@ -2,6 +2,18 @@ import { create } from 'zustand';
 import type { SessionConfig, Session, Question, GeneratedQuestion } from '../types';
 import { generateQuestion, checkAnswer } from '../lib/openai';
 import { createSession, saveQuestion, updateQuestion, updateSession } from '../lib/supabase';
+import {
+  saveLocalSession,
+  updateLocalSession,
+  saveLocalQuestion,
+  updateLocalQuestion,
+  getLocalSessions,
+  getLocalSessionQuestions,
+} from '../lib/localStorage';
+
+// Check if we're in demo mode
+const isDemoMode = !import.meta.env.VITE_SUPABASE_URL ||
+  import.meta.env.VITE_SUPABASE_URL === 'https://placeholder.supabase.co';
 
 interface RetryItem {
   genre: string;
@@ -42,6 +54,10 @@ interface SessionState {
   endSession: () => Promise<void>;
   tick: () => void; // For timer
   reset: () => void;
+
+  // History actions (for demo mode)
+  getSessionHistory: () => Session[];
+  getSessionQuestions: (sessionId: string) => Question[];
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -65,21 +81,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     set({ isLoading: true });
 
-    let session = await createSession({
-      userId,
-      theme: config.theme,
-      customTheme: config.customTheme,
-      gradeLevel: config.gradeLevel,
-      sessionType: config.sessionType,
-      sessionValue: config.sessionType === 'count' ? config.questionCount! : config.timeMinutes!,
-      mode: config.mode,
-    });
+    let session: Session | null = null;
 
-    // Fallback to local session if Supabase is not configured
+    if (!isDemoMode) {
+      session = await createSession({
+        userId,
+        theme: config.theme,
+        customTheme: config.customTheme,
+        gradeLevel: config.gradeLevel,
+        sessionType: config.sessionType,
+        sessionValue: config.sessionType === 'count' ? config.questionCount! : config.timeMinutes!,
+        mode: config.mode,
+      });
+    }
+
+    // Demo mode or Supabase fallback: create local session
     if (!session) {
-      console.warn('Supabase not configured, using local session');
+      console.warn('Using local session (demo mode)');
       session = {
-        id: `local-${Date.now()}`,
+        id: `demo-session-${Date.now()}`,
         userId,
         theme: config.theme,
         customTheme: config.customTheme,
@@ -91,6 +111,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         totalCorrect: 0,
         totalAttempted: 0,
       };
+
+      // Persist to localStorage in demo mode
+      if (isDemoMode) {
+        saveLocalSession(session);
+      }
     }
 
     set({
@@ -134,20 +159,24 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         retryGenre: retryItem?.genre,
       });
 
-      // Save question to database (without answer yet)
-      let savedQuestion = await saveQuestion({
-        sessionId: session.id,
-        questionText: generated.question,
-        correctAnswer: generated.answer,
-        explanation: generated.explanation,
-        genre: generated.genre,
-        questionOrder: nextNumber,
-      });
+      let savedQuestion: Question | null = null;
 
-      // Fallback to local question if Supabase is not configured
+      if (!isDemoMode) {
+        // Try Supabase first
+        savedQuestion = await saveQuestion({
+          sessionId: session.id,
+          questionText: generated.question,
+          correctAnswer: generated.answer,
+          explanation: generated.explanation,
+          genre: generated.genre,
+          questionOrder: nextNumber,
+        });
+      }
+
+      // Demo mode or fallback: create local question
       if (!savedQuestion) {
         savedQuestion = {
-          id: `local-q-${Date.now()}`,
+          id: `demo-q-${Date.now()}-${nextNumber}`,
           sessionId: session.id,
           questionText: generated.question,
           correctAnswer: generated.answer,
@@ -156,6 +185,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           questionOrder: nextNumber,
           createdAt: new Date(),
         };
+
+        // Persist to localStorage in demo mode
+        if (isDemoMode) {
+          saveLocalQuestion(savedQuestion);
+        }
       }
 
       set({
@@ -181,12 +215,20 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     const isCorrect = checkAnswer(userAnswer, currentQuestion.correctAnswer);
 
-    // Update question in database
-    await updateQuestion(currentQuestion.id, {
-      userAnswer,
-      isCorrect,
-      timeSpentSeconds: timeSpent,
-    });
+    // Update question in database or localStorage
+    if (isDemoMode) {
+      updateLocalQuestion(currentQuestion.id, {
+        userAnswer,
+        isCorrect,
+        timeSpentSeconds: timeSpent,
+      });
+    } else {
+      await updateQuestion(currentQuestion.id, {
+        userAnswer,
+        isCorrect,
+        timeSpentSeconds: timeSpent,
+      });
+    }
 
     // Update local question record
     const updatedQuestion: Question = {
@@ -246,19 +288,28 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const newQuestions = [...questions, updatedQuestion];
     const totalCorrect = newQuestions.filter(q => q.isCorrect).length;
 
-    await updateSession(session.id, {
+    const updatedSession = {
+      ...session,
       totalCorrect,
       totalAttempted: newQuestions.length,
-    });
+    };
+
+    if (isDemoMode) {
+      updateLocalSession(session.id, {
+        totalCorrect,
+        totalAttempted: newQuestions.length,
+      });
+    } else {
+      await updateSession(session.id, {
+        totalCorrect,
+        totalAttempted: newQuestions.length,
+      });
+    }
 
     set({
       questions: newQuestions,
       retryQueue: newRetryQueue,
-      session: {
-        ...session,
-        totalCorrect,
-        totalAttempted: newQuestions.length,
-      },
+      session: updatedSession,
     });
 
     return {
@@ -273,17 +324,26 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (!session) return;
 
     const totalCorrect = questions.filter(q => q.isCorrect).length;
+    const endedAt = new Date();
 
-    await updateSession(session.id, {
-      endedAt: new Date(),
-      totalCorrect,
-      totalAttempted: questions.length,
-    });
+    if (isDemoMode) {
+      updateLocalSession(session.id, {
+        endedAt,
+        totalCorrect,
+        totalAttempted: questions.length,
+      });
+    } else {
+      await updateSession(session.id, {
+        endedAt,
+        totalCorrect,
+        totalAttempted: questions.length,
+      });
+    }
 
     set({
       session: {
         ...session,
-        endedAt: new Date(),
+        endedAt,
         totalCorrect,
         totalAttempted: questions.length,
       },
@@ -315,5 +375,22 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       isLoading: false,
       isGenerating: false,
     });
+  },
+
+  // History helpers for demo mode
+  getSessionHistory: () => {
+    if (isDemoMode) {
+      return getLocalSessions().sort((a, b) =>
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+      );
+    }
+    return [];
+  },
+
+  getSessionQuestions: (sessionId: string) => {
+    if (isDemoMode) {
+      return getLocalSessionQuestions(sessionId);
+    }
+    return [];
   },
 }));
