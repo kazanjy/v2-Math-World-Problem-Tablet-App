@@ -33,23 +33,58 @@ export const useAuthStore = create<AuthState>((set) => ({
   isUsingDemoLogin: false,
 
   initialize: async () => {
+    // Check for existing demo profile in localStorage first
+    const existingLocalProfile = getLocalProfile();
+    if (existingLocalProfile) {
+      const mockUser = {
+        id: existingLocalProfile.id,
+        email: existingLocalProfile.email,
+        aud: 'authenticated',
+        role: 'authenticated',
+        created_at: existingLocalProfile.createdAt.toISOString(),
+      } as User;
+
+      set({
+        user: mockUser,
+        profile: existingLocalProfile,
+        isLoading: false,
+        isInitialized: true,
+        isUsingDemoLogin: true,
+      });
+      return;
+    }
+
     if (isDemoMode) {
-      console.warn('Running in demo mode - Supabase not configured, using localStorage');
+      console.warn('Running in demo mode - Supabase not configured');
+      set({
+        user: null,
+        profile: null,
+        isLoading: false,
+        isInitialized: true,
+      });
+      return;
+    }
 
-      // Check for existing profile in localStorage
-      const existingProfile = getLocalProfile();
-      if (existingProfile) {
-        const mockUser = {
-          id: existingProfile.id,
-          email: existingProfile.email,
-          aud: 'authenticated',
-          role: 'authenticated',
-          created_at: existingProfile.createdAt.toISOString(),
-        } as User;
+    // Try to get session from Supabase
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
 
+      if (error) {
+        console.error('Error getting session:', error);
         set({
-          user: mockUser,
-          profile: existingProfile,
+          user: null,
+          profile: null,
+          isLoading: false,
+          isInitialized: true,
+        });
+        return;
+      }
+
+      if (session?.user) {
+        const profile = await getOrCreateProfile(session.user.id, session.user.email || '');
+        set({
+          user: session.user,
+          profile,
           isLoading: false,
           isInitialized: true,
         });
@@ -61,21 +96,26 @@ export const useAuthStore = create<AuthState>((set) => ({
           isInitialized: true,
         });
       }
-      return;
-    }
 
-    // Get initial session from Supabase
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (session?.user) {
-      const profile = await getOrCreateProfile(session.user.id, session.user.email || '');
-      set({
-        user: session.user,
-        profile,
-        isLoading: false,
-        isInitialized: true,
+      // Listen for auth changes
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const profile = await getOrCreateProfile(session.user.id, session.user.email || '');
+          set({
+            user: session.user,
+            profile,
+            isLoading: false,
+          });
+        } else if (event === 'SIGNED_OUT') {
+          set({
+            user: null,
+            profile: null,
+            isLoading: false,
+          });
+        }
       });
-    } else {
+    } catch (error) {
+      console.error('Error initializing auth:', error);
       set({
         user: null,
         profile: null,
@@ -83,24 +123,6 @@ export const useAuthStore = create<AuthState>((set) => ({
         isInitialized: true,
       });
     }
-
-    // Listen for auth changes
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const profile = await getOrCreateProfile(session.user.id, session.user.email || '');
-        set({
-          user: session.user,
-          profile,
-          isLoading: false,
-        });
-      } else if (event === 'SIGNED_OUT') {
-        set({
-          user: null,
-          profile: null,
-          isLoading: false,
-        });
-      }
-    });
   },
 
   login: async (email: string) => {
@@ -130,14 +152,21 @@ export const useAuthStore = create<AuthState>((set) => ({
         user: mockUser,
         profile: mockProfile,
         isLoading: false,
+        isInitialized: true,
+        isUsingDemoLogin: true,
       });
 
       return { error: null };
     }
 
-    const { error } = await signInWithMagicLink(email);
-    set({ isLoading: false });
-    return { error: error ? new Error(error.message) : null };
+    try {
+      const { error } = await signInWithMagicLink(email);
+      set({ isLoading: false });
+      return { error: error ? new Error(error.message) : null };
+    } catch (error) {
+      set({ isLoading: false });
+      return { error: error as Error };
+    }
   },
 
   loginAsDemo: async () => {
@@ -165,6 +194,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       user: mockUser,
       profile: mockProfile,
       isLoading: false,
+      isInitialized: true,
       isUsingDemoLogin: true,
     });
 
@@ -178,7 +208,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     clearLocalProfile();
 
     if (!isDemoMode) {
-      await signOut();
+      try {
+        await signOut();
+      } catch (error) {
+        console.error('Error signing out:', error);
+      }
     }
 
     set({
@@ -190,13 +224,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   clearDemoData: () => {
-    if (isDemoMode) {
-      clearAllLocalData();
-      set({
-        user: null,
-        profile: null,
-      });
-    }
+    clearAllLocalData();
+    set({
+      user: null,
+      profile: null,
+      isUsingDemoLogin: false,
+    });
   },
 }));
 
