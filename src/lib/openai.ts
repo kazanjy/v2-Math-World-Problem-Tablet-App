@@ -177,15 +177,26 @@ Respond in JSON format exactly like this:
 
 // Helper to normalize answers for comparison
 export function normalizeAnswer(answer: string): string {
-  // Remove whitespace
+  // Remove extra whitespace and lowercase
   let normalized = answer.trim().toLowerCase();
 
-  // Handle fractions - convert to decimal for comparison
-  if (normalized.includes('/')) {
+  // Handle mixed numbers like "1 1/2" or "2 3/4"
+  const mixedNumberMatch = normalized.match(/^(-?\d+)\s+(\d+)\/(\d+)$/);
+  if (mixedNumberMatch) {
+    const whole = parseFloat(mixedNumberMatch[1]);
+    const numerator = parseFloat(mixedNumberMatch[2]);
+    const denominator = parseFloat(mixedNumberMatch[3]);
+    if (!isNaN(whole) && !isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
+      const sign = whole < 0 ? -1 : 1;
+      normalized = (whole + sign * (numerator / denominator)).toString();
+    }
+  }
+  // Handle simple fractions like "3/4"
+  else if (normalized.includes('/')) {
     const parts = normalized.split('/');
     if (parts.length === 2) {
-      const numerator = parseFloat(parts[0]);
-      const denominator = parseFloat(parts[1]);
+      const numerator = parseFloat(parts[0].trim());
+      const denominator = parseFloat(parts[1].trim());
       if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
         normalized = (numerator / denominator).toString();
       }
