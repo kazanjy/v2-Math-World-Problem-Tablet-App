@@ -23,6 +23,51 @@ export type GradeLevel = 'K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '
 
 export const GRADE_LEVELS: GradeLevel[] = ['K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
+// Math topics
+export type Topic =
+  | 'addition'
+  | 'subtraction'
+  | 'multiplication'
+  | 'division'
+  | 'fractions'
+  | 'decimals'
+  | 'percentages'
+  | 'word-problems'
+  | 'pre-algebra'
+  | 'algebra'
+  | 'geometry';
+
+export const TOPICS: Topic[] = [
+  'addition',
+  'subtraction',
+  'multiplication',
+  'division',
+  'fractions',
+  'decimals',
+  'percentages',
+  'word-problems',
+  'pre-algebra',
+  'algebra',
+  'geometry',
+];
+
+export const TOPIC_LABELS: Record<Topic, string> = {
+  'addition': 'Addition',
+  'subtraction': 'Subtraction',
+  'multiplication': 'Multiplication',
+  'division': 'Division',
+  'fractions': 'Fractions',
+  'decimals': 'Decimals',
+  'percentages': 'Percentages',
+  'word-problems': 'Word Problems',
+  'pre-algebra': 'Pre-Algebra',
+  'algebra': 'Algebra',
+  'geometry': 'Geometry',
+};
+
+// Difficulty levels returned by OpenAI
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'super-hard';
+
 // Session type: fixed number of questions or timed
 export type SessionType = 'count' | 'timed';
 
@@ -33,7 +78,8 @@ export type SessionMode = 'chill' | 'race';
 export interface SessionConfig {
   theme: Theme;
   customTheme?: string;
-  gradeLevel: GradeLevel;
+  gradeLevel?: GradeLevel; // Optional - used when not selecting topics
+  topics?: Topic[]; // Optional - used when selecting specific topics (mutually exclusive with gradeLevel)
   sessionType: SessionType;
   questionCount?: number;
   timeMinutes?: number;
@@ -46,6 +92,7 @@ export interface GeneratedQuestion {
   answer: string;
   explanation: string;
   genre: string;
+  difficulty: Difficulty;
 }
 
 // Question record in session
@@ -56,6 +103,7 @@ export interface Question {
   correctAnswer: string;
   explanation: string;
   genre: string;
+  difficulty: Difficulty;
   userAnswer?: string;
   isCorrect?: boolean;
   timeSpentSeconds?: number;
@@ -69,7 +117,8 @@ export interface Session {
   userId: string;
   theme: Theme;
   customTheme?: string;
-  gradeLevel: GradeLevel;
+  gradeLevel?: GradeLevel;
+  topics?: Topic[];
   sessionType: SessionType;
   sessionValue: number; // question count or minutes
   mode: SessionMode;
@@ -87,15 +136,25 @@ export interface UserProfile {
   createdAt: Date;
 }
 
-// Keypad configuration based on grade level
+// Keypad configuration based on grade level or topics
 export interface KeypadConfig {
   showDecimal: boolean;
   showNegative: boolean;
   showFraction: boolean;
 }
 
-export function getKeypadConfig(gradeLevel: GradeLevel): KeypadConfig {
-  const gradeNum = gradeLevel === 'K' ? 0 : parseInt(gradeLevel);
+export function getKeypadConfig(gradeLevel?: GradeLevel, topics?: Topic[]): KeypadConfig {
+  // If topics are selected, show all keypad options
+  if (topics && topics.length > 0) {
+    return {
+      showDecimal: true,
+      showNegative: true,
+      showFraction: true,
+    };
+  }
+
+  // Otherwise, base it on grade level
+  const gradeNum = !gradeLevel ? 3 : (gradeLevel === 'K' ? 0 : parseInt(gradeLevel));
   return {
     showDecimal: gradeNum >= 3,
     showNegative: gradeNum >= 6,

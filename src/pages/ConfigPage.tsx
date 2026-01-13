@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { getSavedSettings, saveSettings } from '../lib/localStorage';
-import type { Theme, GradeLevel, SessionType, SessionMode } from '../types';
-import { THEME_LABELS, GRADE_LEVELS } from '../types';
+import type { SelectionMode } from '../lib/localStorage';
+import type { Theme, GradeLevel, SessionType, SessionMode, Topic } from '../types';
+import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS } from '../types';
 
 const PRESET_QUESTION_COUNTS = [5, 10, 15, 20];
 const PRESET_TIME_OPTIONS = [5, 10, 15];
@@ -20,7 +21,9 @@ export function ConfigPage() {
   // Form state
   const [theme, setTheme] = useState<Theme>('standard');
   const [customTheme, setCustomTheme] = useState('');
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('grade');
   const [gradeLevel, setGradeLevel] = useState<GradeLevel>('3');
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [sessionType, setSessionType] = useState<SessionType>('count');
   const [questionCount, setQuestionCount] = useState(10);
   const [customQuestionCount, setCustomQuestionCount] = useState('');
@@ -34,7 +37,9 @@ export function ConfigPage() {
     if (saved) {
       setTheme(saved.theme);
       setCustomTheme(saved.customTheme || '');
+      setSelectionMode(saved.selectionMode || 'grade');
       setGradeLevel(saved.gradeLevel);
+      setTopics(saved.topics || []);
       setSessionType(saved.sessionType);
       setQuestionCount(saved.questionCount);
       setCustomQuestionCount(saved.customQuestionCount);
@@ -44,6 +49,15 @@ export function ConfigPage() {
     }
   }, []);
 
+  // Toggle a topic selection
+  const toggleTopic = (topic: Topic) => {
+    setTopics(prev =>
+      prev.includes(topic)
+        ? prev.filter(t => t !== topic)
+        : [...prev, topic]
+    );
+  };
+
   const handleStart = async () => {
     setIsStarting(true);
 
@@ -52,7 +66,9 @@ export function ConfigPage() {
       saveSettings({
         theme,
         customTheme,
+        selectionMode,
         gradeLevel,
+        topics,
         sessionType,
         questionCount,
         customQuestionCount,
@@ -64,7 +80,9 @@ export function ConfigPage() {
       const config = {
         theme,
         customTheme: theme === 'custom' ? customTheme : undefined,
-        gradeLevel,
+        // Only include gradeLevel if in grade mode, only include topics if in topics mode
+        gradeLevel: selectionMode === 'grade' ? gradeLevel : undefined,
+        topics: selectionMode === 'topics' ? topics : undefined,
         sessionType,
         questionCount: sessionType === 'count'
           ? (customQuestionCount ? parseInt(customQuestionCount) : questionCount)
@@ -133,24 +151,76 @@ export function ConfigPage() {
             )}
           </div>
 
-          {/* Grade Level */}
+          {/* Selection Mode Toggle */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Grade Level</label>
-            <div className="flex flex-wrap gap-2">
-              {GRADE_LEVELS.map((g) => (
-                <button
-                  key={g}
-                  onClick={() => setGradeLevel(g)}
-                  className={`px-4 py-3 rounded-lg border-2 min-w-[50px] transition-all ${
-                    gradeLevel === g
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  {g}
-                </button>
-              ))}
+            <label className="block text-sm font-medium text-gray-700 mb-3">Practice By</label>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <button
+                onClick={() => setSelectionMode('grade')}
+                className={`px-4 py-4 rounded-lg border-2 transition-all ${
+                  selectionMode === 'grade'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-semibold">Grade Level</div>
+                <div className="text-sm text-gray-500">Age-appropriate mix of topics</div>
+              </button>
+              <button
+                onClick={() => setSelectionMode('topics')}
+                className={`px-4 py-4 rounded-lg border-2 transition-all ${
+                  selectionMode === 'topics'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="font-semibold">Specific Topics</div>
+                <div className="text-sm text-gray-500">Choose what to practice</div>
+              </button>
             </div>
+
+            {/* Grade Level Selection */}
+            {selectionMode === 'grade' && (
+              <div className="flex flex-wrap gap-2">
+                {GRADE_LEVELS.map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setGradeLevel(g)}
+                    className={`px-4 py-3 rounded-lg border-2 min-w-[50px] transition-all ${
+                      gradeLevel === g
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Topics Selection */}
+            {selectionMode === 'topics' && (
+              <div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {TOPICS.map((topic) => (
+                    <button
+                      key={topic}
+                      onClick={() => toggleTopic(topic)}
+                      className={`px-4 py-3 rounded-lg border-2 transition-all text-left ${
+                        topics.includes(topic)
+                          ? 'border-purple-500 bg-purple-50 text-purple-700'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {TOPIC_LABELS[topic]}
+                    </button>
+                  ))}
+                </div>
+                {topics.length === 0 && (
+                  <p className="mt-2 text-sm text-amber-600">Select at least one topic to continue</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Session Type */}
@@ -295,7 +365,11 @@ export function ConfigPage() {
           {/* Start Button */}
           <button
             onClick={handleStart}
-            disabled={isStarting || (theme === 'custom' && !customTheme.trim())}
+            disabled={
+              isStarting ||
+              (theme === 'custom' && !customTheme.trim()) ||
+              (selectionMode === 'topics' && topics.length === 0)
+            }
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 px-6 rounded-xl text-xl transition-all shadow-lg hover:shadow-xl"
           >
             {isStarting ? (

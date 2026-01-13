@@ -55,7 +55,7 @@ interface SessionState {
   setConfig: (config: SessionConfig) => void;
   startSession: (userId: string) => Promise<void>;
   nextQuestion: () => Promise<void>;
-  submitAnswer: (userAnswer: string) => Promise<{ isCorrect: boolean; correctAnswer: string; explanation: string; genre: string }>;
+  submitAnswer: (userAnswer: string) => Promise<{ isCorrect: boolean; correctAnswer: string; explanation: string; genre: string; difficulty: string }>;
   endSession: () => Promise<void>;
   tick: () => void; // For timer
   reset: () => void;
@@ -109,6 +109,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         theme: config.theme,
         customTheme: config.customTheme,
         gradeLevel: config.gradeLevel,
+        topics: config.topics,
         sessionType: config.sessionType,
         sessionValue: config.sessionType === 'count' ? config.questionCount! : config.timeMinutes!,
         mode: config.mode,
@@ -159,6 +160,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         theme: config.theme,
         customTheme: config.customTheme,
         gradeLevel: config.gradeLevel,
+        topics: config.topics,
         previousQuestion,
         isRetry,
         retryGenre: retryItem?.genre,
@@ -174,6 +176,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           correctAnswer: generated.answer,
           explanation: generated.explanation,
           genre: generated.genre,
+          difficulty: generated.difficulty,
           questionOrder: nextNumber,
         });
       }
@@ -187,6 +190,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           correctAnswer: generated.answer,
           explanation: generated.explanation,
           genre: generated.genre,
+          difficulty: generated.difficulty,
           questionOrder: nextNumber,
           createdAt: new Date(),
         };
@@ -211,7 +215,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   submitAnswer: async (userAnswer: string) => {
     const { currentQuestion, session, questions, questionNumber, questionStartTime, retryQueue } = get();
     if (!currentQuestion || !session) {
-      return { isCorrect: false, correctAnswer: '', explanation: '', genre: '' };
+      return { isCorrect: false, correctAnswer: '', explanation: '', genre: '', difficulty: '' };
     }
 
     const timeSpent = questionStartTime
@@ -322,6 +326,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       correctAnswer: currentQuestion.correctAnswer,
       explanation: currentQuestion.explanation,
       genre: currentQuestion.genre,
+      difficulty: currentQuestion.difficulty,
     };
   },
 

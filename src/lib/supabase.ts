@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Session, Question, UserProfile } from '../types';
+import type { Session, Question, UserProfile, Difficulty } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -136,6 +136,7 @@ export async function saveQuestion(question: Omit<Question, 'id' | 'createdAt'>)
       correct_answer: question.correctAnswer,
       explanation: question.explanation,
       genre: question.genre,
+      difficulty: question.difficulty,
       user_answer: question.userAnswer,
       is_correct: question.isCorrect,
       time_spent_seconds: question.timeSpentSeconds,
@@ -156,6 +157,7 @@ export async function saveQuestion(question: Omit<Question, 'id' | 'createdAt'>)
     correctAnswer: data.correct_answer,
     explanation: data.explanation,
     genre: data.genre,
+    difficulty: (data.difficulty || 'medium') as Difficulty,
     userAnswer: data.user_answer,
     isCorrect: data.is_correct,
     timeSpentSeconds: data.time_spent_seconds,
@@ -196,6 +198,7 @@ export async function getSessionQuestions(sessionId: string): Promise<Question[]
     correctAnswer: q.correct_answer,
     explanation: q.explanation,
     genre: q.genre,
+    difficulty: (q.difficulty || 'medium') as Difficulty,
     userAnswer: q.user_answer,
     isCorrect: q.is_correct,
     timeSpentSeconds: q.time_spent_seconds,

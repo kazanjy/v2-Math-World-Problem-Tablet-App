@@ -1,4 +1,4 @@
-import type { Session, Question, UserProfile, Theme, GradeLevel, SessionType, SessionMode } from '../types';
+import type { Session, Question, UserProfile, Theme, GradeLevel, SessionType, SessionMode, Topic } from '../types';
 
 const STORAGE_KEYS = {
   PROFILE: 'mmg_profile',
@@ -131,10 +131,14 @@ export function getLocalStats(): { totalSessions: number; totalQuestions: number
 }
 
 // Settings helpers
+export type SelectionMode = 'grade' | 'topics';
+
 export interface SavedSettings {
   theme: Theme;
   customTheme?: string;
+  selectionMode: SelectionMode;
   gradeLevel: GradeLevel;
+  topics: Topic[];
   sessionType: SessionType;
   questionCount: number;
   customQuestionCount: string;

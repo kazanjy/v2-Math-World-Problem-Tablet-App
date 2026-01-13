@@ -11,6 +11,7 @@ interface FeedbackState {
   correctAnswer: string;
   explanation: string;
   genre: string;
+  difficulty: string;
 }
 
 export function PlayPage() {
@@ -35,6 +36,7 @@ export function PlayPage() {
     correctAnswer: '',
     explanation: '',
     genre: '',
+    difficulty: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -88,13 +90,14 @@ export function PlayPage() {
       correctAnswer: result.correctAnswer,
       explanation: result.explanation,
       genre: result.genre,
+      difficulty: result.difficulty,
     });
 
     setIsSubmitting(false);
   }, [answer, submitAnswer, isSubmitting]);
 
   const handleNext = useCallback(async () => {
-    setFeedback({ show: false, isCorrect: false, correctAnswer: '', explanation: '', genre: '' });
+    setFeedback({ show: false, isCorrect: false, correctAnswer: '', explanation: '', genre: '', difficulty: '' });
     setAnswer('');
 
     // Check if session should end
@@ -130,7 +133,7 @@ export function PlayPage() {
     return null;
   }
 
-  const keypadConfig = getKeypadConfig(config.gradeLevel);
+  const keypadConfig = getKeypadConfig(config.gradeLevel, config.topics);
   const isTimedAndExpired = config.sessionType === 'timed' && timeRemaining !== null && timeRemaining <= 0;
   const canContinue = config.mode === 'chill' || !isTimedAndExpired;
 
@@ -204,6 +207,16 @@ export function PlayPage() {
                 <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full capitalize">
                   {feedback.genre.replace(/-/g, ' ')}
                 </span>
+                {feedback.difficulty && (
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full capitalize ${
+                    feedback.difficulty === 'easy' ? 'text-green-600 bg-green-100' :
+                    feedback.difficulty === 'medium' ? 'text-yellow-600 bg-yellow-100' :
+                    feedback.difficulty === 'hard' ? 'text-orange-600 bg-orange-100' :
+                    'text-red-600 bg-red-100'
+                  }`}>
+                    {feedback.difficulty.replace(/-/g, ' ')}
+                  </span>
+                )}
               </div>
               <h4 className="font-semibold text-gray-700 mb-1">How to solve it:</h4>
               <p className="text-gray-600 text-sm">{feedback.explanation}</p>

@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { GradeLevel, Theme, GeneratedQuestion } from '../types';
+import type { GradeLevel, Theme, Topic, GeneratedQuestion, Difficulty } from '../types';
 
 const openaiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
@@ -15,14 +15,15 @@ const openai = new OpenAI({
 interface GenerateQuestionParams {
   theme: Theme;
   customTheme?: string;
-  gradeLevel: GradeLevel;
+  gradeLevel?: GradeLevel; // Optional - used when not selecting topics
+  topics?: Topic[]; // Optional - used when selecting specific topics
   previousQuestion?: string;
   isRetry?: boolean;
   retryGenre?: string;
 }
 
 export async function generateQuestion(params: GenerateQuestionParams): Promise<GeneratedQuestion> {
-  const { theme, customTheme, gradeLevel, previousQuestion, isRetry, retryGenre } = params;
+  const { theme, customTheme, gradeLevel, topics, previousQuestion, isRetry, retryGenre } = params;
 
   const themeDescription = theme === 'custom' && customTheme
     ? customTheme
@@ -30,16 +31,30 @@ export async function generateQuestion(params: GenerateQuestionParams): Promise<
     ? 'general everyday scenarios'
     : theme;
 
-  const gradeDescription = gradeLevel === 'K'
-    ? 'Kindergarten (ages 5-6)'
-    : `Grade ${gradeLevel}`;
+  // Determine if we're in topic mode or grade mode
+  const isTopicMode = topics && topics.length > 0;
 
-  let prompt = `Generate a math word problem for a ${gradeDescription} student.
+  let prompt: string;
+
+  if (isTopicMode) {
+    // Topic-based mode
+    const topicList = topics.join(', ');
+    prompt = `Generate a math word problem focusing on one of these topics: ${topicList}.
 
 Theme: ${themeDescription}
 ${theme === 'custom' ? `Use this theme for the story context: ${customTheme}` : `Incorporate ${themeDescription} elements into the story.`}
 
 `;
+  } else {
+    // Grade-based mode
+    const gradeDescription = !gradeLevel ? 'Grade 3' : (gradeLevel === 'K' ? 'Kindergarten (ages 5-6)' : `Grade ${gradeLevel}`);
+    prompt = `Generate a math word problem for a ${gradeDescription} student.
+
+Theme: ${themeDescription}
+${theme === 'custom' ? `Use this theme for the story context: ${customTheme}` : `Incorporate ${themeDescription} elements into the story.`}
+
+`;
+  }
 
   if (isRetry && retryGenre) {
     prompt += `The student struggled with this concept: ${retryGenre}
@@ -53,7 +68,24 @@ Generate a DIFFERENT type of math problem (different operation or concept).
 `;
   }
 
-  prompt += `Requirements:
+  if (isTopicMode) {
+    prompt += `Requirements:
+- Focus on one of these topics: ${topics!.join(', ')}
+- The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")
+- Make the word problem engaging and fun with the ${themeDescription} theme
+- Gradually increase difficulty over time - start with easier problems and progress to harder ones
+
+Respond in JSON format exactly like this:
+{
+  "question": "The word problem text",
+  "answer": "The numeric answer (number only, e.g., '42' or '3.5' or '3/4')",
+  "explanation": "Step-by-step solution explanation showing how to solve it",
+  "genre": "The specific math concept being tested (e.g., 'addition', 'subtraction', 'multiplication', 'division', 'fractions', 'decimals', 'percentages', 'pre-algebra', 'algebra', 'geometry', 'word-problems')",
+  "difficulty": "The difficulty level of this problem: 'easy', 'medium', 'hard', or 'super-hard'"
+}`;
+  } else {
+    const gradeDescription = !gradeLevel ? 'Grade 3' : (gradeLevel === 'K' ? 'Kindergarten (ages 5-6)' : `Grade ${gradeLevel}`);
+    prompt += `Requirements:
 - The problem should be appropriate for ${gradeDescription} students
 - The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")
 - Make the word problem engaging and fun with the ${themeDescription} theme
@@ -63,8 +95,10 @@ Respond in JSON format exactly like this:
   "question": "The word problem text",
   "answer": "The numeric answer (number only, e.g., '42' or '3.5' or '3/4')",
   "explanation": "Step-by-step solution explanation showing how to solve it",
-  "genre": "The math concept being tested (e.g., 'addition', 'subtraction', 'multiplication', 'division', 'fractions', 'percentages', 'word-problem-distance', 'word-problem-money')"
+  "genre": "The math concept being tested (e.g., 'addition', 'subtraction', 'multiplication', 'division', 'fractions', 'percentages', 'word-problem-distance', 'word-problem-money')",
+  "difficulty": "The difficulty level of this problem: 'easy', 'medium', 'hard', or 'super-hard'"
 }`;
+  }
 
   try {
     const response = await openai.chat.completions.create({
@@ -91,8 +125,14 @@ Respond in JSON format exactly like this:
     const parsed = JSON.parse(content) as GeneratedQuestion;
 
     // Validate the response has all required fields
-    if (!parsed.question || !parsed.answer || !parsed.explanation || !parsed.genre) {
+    if (!parsed.question || !parsed.answer || !parsed.explanation || !parsed.genre || !parsed.difficulty) {
       throw new Error('Invalid response format from OpenAI');
+    }
+
+    // Validate difficulty is one of the expected values
+    const validDifficulties: Difficulty[] = ['easy', 'medium', 'hard', 'super-hard'];
+    if (!validDifficulties.includes(parsed.difficulty)) {
+      parsed.difficulty = 'medium'; // Default to medium if invalid
     }
 
     return parsed;
@@ -104,6 +144,7 @@ Respond in JSON format exactly like this:
       answer: '8',
       explanation: 'Start with 5, add 3 more. 5 + 3 = 8.',
       genre: 'addition',
+      difficulty: 'easy',
     };
   }
 }
