@@ -186,7 +186,7 @@ export function PlayPage() {
               <span className="ml-3 text-gray-600">Generating question...</span>
             </div>
           ) : currentQuestion ? (
-            <p className="text-lg text-gray-800 leading-relaxed">
+            <p className="text-xl text-gray-800 leading-relaxed">
               {currentQuestion.questionText}
             </p>
           ) : (
@@ -247,7 +247,7 @@ export function PlayPage() {
                 )}
               </div>
               <h4 className="font-semibold text-gray-700 mb-1">How to solve it:</h4>
-              <p className="text-gray-600 text-sm">{feedback.explanation}</p>
+              <p className="text-gray-600 text-base">{feedback.explanation}</p>
             </div>
 
             {canContinue ? (
