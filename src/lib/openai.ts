@@ -20,12 +20,16 @@ interface GenerateQuestionParams {
   topics?: Topic[]; // Optional - used when selecting specific topics
   topicDifficulties?: TopicDifficultySettings; // Difficulty settings per topic
   previousQuestion?: string;
+  previousGenre?: string; // Genre of previous question for variety
+  previousSubTopic?: string; // Sub-topic of previous question for variety
+  recentSubTopics?: string[]; // Last N sub-topics to avoid repeating
+  selectedTopic?: Topic; // Pre-selected topic (for random selection)
   isRetry?: boolean;
   retryGenre?: string;
 }
 
 export async function generateQuestion(params: GenerateQuestionParams): Promise<GeneratedQuestion> {
-  const { theme, customTheme, gradeLevel, topics, topicDifficulties, previousQuestion, isRetry, retryGenre } = params;
+  const { theme, customTheme, gradeLevel, topics, topicDifficulties, previousQuestion, previousGenre, previousSubTopic, recentSubTopics, selectedTopic, isRetry, retryGenre } = params;
 
   const themeDescription = theme === 'custom' && customTheme
     ? customTheme
@@ -39,13 +43,15 @@ export async function generateQuestion(params: GenerateQuestionParams): Promise<
   let prompt: string;
 
   if (isTopicMode) {
-    // Topic-based mode
-    const topicList = topics.join(', ');
+    // Topic-based mode - use pre-selected topic if provided, otherwise list all
+    const topicToUse = selectedTopic || topics[0];
+    const topicList = selectedTopic ? selectedTopic : topics.join(', ');
 
     // Build difficulty constraints per topic
     let difficultyConstraints = '';
     if (topicDifficulties) {
-      const constraints = topics.map(topic => {
+      const topicsToConstrain = selectedTopic ? [selectedTopic] : topics;
+      const constraints = topicsToConstrain.map(topic => {
         const difficulties = topicDifficulties[topic];
         if (difficulties && difficulties.length > 0 && difficulties.length < 4) {
           const diffLabels = difficulties.map(d => DIFFICULTY_FULL_LABELS[d]).join(', ');
@@ -62,11 +68,24 @@ ${constraints.join('\n')}
       }
     }
 
-    prompt = `Generate a math word problem focusing on one of these topics: ${topicList}.
+    // Build variety constraints
+    let varietyConstraints = '';
+    if (previousGenre || previousSubTopic || (recentSubTopics && recentSubTopics.length > 0)) {
+      varietyConstraints = '\nVARIETY REQUIREMENTS (IMPORTANT):\n';
+      if (previousGenre) {
+        varietyConstraints += `- The previous question was "${previousGenre}"${previousSubTopic ? ` with sub-topic "${previousSubTopic}"` : ''}. Choose a DIFFERENT sub-topic.\n`;
+      }
+      if (recentSubTopics && recentSubTopics.length > 0) {
+        varietyConstraints += `- DO NOT use any of these recently used sub-topics: ${recentSubTopics.join(', ')}\n`;
+      }
+      varietyConstraints += `- Pick a fresh sub-topic that hasn't been used recently.\n`;
+    }
+
+    prompt = `Generate a math word problem focusing on ${selectedTopic ? `this topic: ${topicToUse}` : `one of these topics: ${topicList}`}.
 
 Theme: ${themeDescription}
 ${theme === 'custom' ? `Use this theme for the story context: ${customTheme}` : `Incorporate ${themeDescription} elements into the story.`}
-${difficultyConstraints}
+${difficultyConstraints}${varietyConstraints}
 `;
   } else {
     // Grade-based mode

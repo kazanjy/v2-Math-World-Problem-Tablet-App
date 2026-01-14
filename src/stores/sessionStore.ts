@@ -44,6 +44,9 @@ interface SessionState {
   // Retry queue for spaced repetition
   retryQueue: RetryItem[];
 
+  // Recent sub-topics for variety (last 5)
+  recentSubTopics: string[];
+
   // Session results
   questions: Question[];
 
@@ -74,6 +77,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   questionStartTime: null,
   timeRemaining: null,
   retryQueue: [],
+  recentSubTopics: [],
   questions: [],
   isLoading: false,
   isGenerating: false,
@@ -131,6 +135,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       isLoading: false,
       questions: [],
       retryQueue: [],
+      recentSubTopics: [],
       questionNumber: 0,
     });
 
@@ -139,7 +144,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   nextQuestion: async () => {
-    const { config, session, questionNumber, questions, retryQueue } = get();
+    const { config, session, questionNumber, questions, retryQueue, recentSubTopics } = get();
     if (!config || !session) return;
 
     set({ isGenerating: true, questionStartTime: new Date() });
@@ -150,10 +155,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const retryItem = retryQueue.find(r => r.scheduledPosition === nextNumber);
     const isRetry = !!retryItem;
 
-    // Get the previous question for variety (if not a retry)
-    const previousQuestion = !isRetry && questions.length > 0
-      ? questions[questions.length - 1].questionText
-      : undefined;
+    // Get the previous question details for variety (if not a retry)
+    const lastQuestion = !isRetry && questions.length > 0 ? questions[questions.length - 1] : undefined;
+    const previousQuestion = lastQuestion?.questionText;
+    const previousGenre = lastQuestion?.genre;
+    const previousSubTopic = lastQuestion?.subTopic;
+
+    // Randomly select a topic when multiple are enabled (for variety)
+    let selectedTopic: typeof config.topics extends (infer T)[] ? T : never | undefined;
+    if (config.topics && config.topics.length > 1 && !isRetry) {
+      const randomIndex = Math.floor(Math.random() * config.topics.length);
+      selectedTopic = config.topics[randomIndex];
+    }
 
     try {
       const generated = await generateQuestion({
@@ -163,6 +176,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         topics: config.topics,
         topicDifficulties: config.topicDifficulties,
         previousQuestion,
+        previousGenre,
+        previousSubTopic,
+        recentSubTopics,
+        selectedTopic,
         isRetry,
         retryGenre: retryItem?.genre,
       });
@@ -204,9 +221,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         }
       }
 
+      // Update recent sub-topics (keep last 5)
+      const newRecentSubTopics = [...recentSubTopics, generated.subTopic].slice(-5);
+
       set({
         currentQuestion: { ...savedQuestion, generated },
         questionNumber: nextNumber,
+        recentSubTopics: newRecentSubTopics,
         isGenerating: false,
       });
     } catch (error) {
@@ -387,6 +408,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       questionStartTime: null,
       timeRemaining: null,
       retryQueue: [],
+      recentSubTopics: [],
       questions: [],
       isLoading: false,
       isGenerating: false,
