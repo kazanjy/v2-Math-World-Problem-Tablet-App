@@ -110,20 +110,20 @@ Generate a DIFFERENT type of math problem (different operation or concept).
 `;
   }
 
-  // Sub-topic taxonomy guidance for the AI
+  // Sub-topic taxonomy guidance for the AI with difficulty hints
   const subTopicGuidance = `
-Sub-topic examples by genre:
-- addition: "single-digit", "double-digit-no-carrying", "double-digit-with-carrying", "adding-three-numbers", "adding-money"
-- subtraction: "single-digit", "double-digit-no-borrowing", "double-digit-with-borrowing", "subtracting-across-zeros", "subtracting-money"
-- multiplication: "times-tables", "single-by-double-digit", "double-by-double-digit", "multiplying-by-10-100-1000", "multiplying-decimals"
-- division: "basic-division-facts", "division-with-remainders", "long-division", "dividing-by-10-100-1000", "dividing-decimals"
-- fractions: "identifying-fractions", "equivalent-fractions", "comparing-fractions", "adding-same-denominator", "adding-different-denominators", "subtracting-fractions", "multiplying-fractions", "dividing-fractions", "mixed-numbers", "fraction-of-whole"
-- decimals: "place-value", "comparing-decimals", "adding-decimals", "subtracting-decimals", "multiplying-decimals", "dividing-decimals", "decimal-fraction-conversion"
-- percentages: "percent-of-number", "fraction-decimal-percent-conversion", "percent-increase-decrease", "discounts-sales-tax", "tips-gratuity"
-- word-problems: "money-problems", "time-distance-rate", "measurement", "comparison", "multi-step"
-- pre-algebra: "order-of-operations", "variables-expressions", "one-step-equations", "inequalities", "negative-numbers", "absolute-value", "ratios-proportions"
-- algebra: "two-step-equations", "multi-step-equations", "systems-of-equations", "polynomials", "factoring", "quadratics"
-- geometry: "shape-properties", "perimeter", "area-rectangles", "area-triangles-circles", "volume", "angles", "pythagorean-theorem", "coordinate-geometry"
+Sub-topic examples by genre (with difficulty hints E=Easy, M=Medium, H=Hard, SH=Super-Hard):
+- addition: "single-digit" (E), "double-digit-no-carrying" (E), "double-digit-with-carrying" (M), "adding-three-numbers" (M), "adding-money" (M)
+- subtraction: "single-digit" (E), "double-digit-no-borrowing" (E), "double-digit-with-borrowing" (M), "subtracting-across-zeros" (H), "subtracting-money" (M)
+- multiplication: "times-tables" (E), "single-by-double-digit" (M), "double-by-double-digit" (H), "multiplying-by-10-100-1000" (E), "multiplying-decimals" (H)
+- division: "basic-division-facts" (E), "division-with-remainders" (M), "long-division" (H), "dividing-by-10-100-1000" (E), "dividing-decimals" (H)
+- fractions: "identifying-fractions" (E), "equivalent-fractions" (E), "comparing-fractions" (M), "adding-same-denominator" (E), "adding-different-denominators" (M), "subtracting-fractions" (M), "multiplying-fractions" (H), "dividing-fractions" (H), "mixed-numbers" (M), "fraction-of-whole" (M)
+- decimals: "place-value" (E), "comparing-decimals" (E), "adding-decimals" (M), "subtracting-decimals" (M), "multiplying-decimals" (H), "dividing-decimals" (H), "decimal-fraction-conversion" (M)
+- percentages: "percent-of-number" (M), "fraction-decimal-percent-conversion" (M), "percent-increase-decrease" (H), "discounts-sales-tax" (M), "tips-gratuity" (M)
+- word-problems: "money-problems" (E-M), "time-distance-rate" (M-H), "measurement" (E-M), "comparison" (E-M), "multi-step" (H)
+- pre-algebra: "order-of-operations" (M), "variables-expressions" (M), "one-step-equations" (M), "inequalities" (H), "negative-numbers" (M), "absolute-value" (M), "ratios-proportions" (M)
+- algebra: "two-step-equations" (M), "multi-step-equations" (H), "systems-of-equations" (SH), "polynomials" (H), "factoring" (H), "quadratics" (SH)
+- geometry: "shape-identification" (E), "counting-sides-vertices" (E), "shape-properties" (E-M), "perimeter-squares-rectangles" (E), "perimeter-triangles" (M), "perimeter-irregular" (M), "area-rectangles" (E-M), "area-triangles" (M), "area-circles" (M), "area-composite-shapes" (H), "volume-cubes-boxes" (M), "volume-cylinders" (H), "angles-identifying" (E), "angles-measuring" (M), "angles-calculating" (M), "complementary-supplementary" (M), "pythagorean-theorem" (H), "coordinate-geometry" (H-SH)
 `;
 
   if (isTopicMode) {
