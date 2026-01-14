@@ -71,14 +71,31 @@ ${constraints.join('\n')}
     // Build variety constraints
     let varietyConstraints = '';
     if (previousGenre || previousSubTopic || (recentSubTopics && recentSubTopics.length > 0)) {
-      varietyConstraints = '\nVARIETY REQUIREMENTS (IMPORTANT):\n';
+      varietyConstraints = '\nVARIETY REQUIREMENTS (CRITICAL - MUST FOLLOW):\n';
+
+      // Extract parent categories from recent sub-topics (e.g., "perimeter-triangles" -> "perimeter")
+      const recentCategories = new Set<string>();
+      if (recentSubTopics) {
+        for (const subTopic of recentSubTopics) {
+          // Extract the first word/concept as the parent category
+          const category = subTopic.split('-')[0];
+          if (category) {
+            recentCategories.add(category);
+          }
+        }
+      }
+
       if (previousGenre) {
-        varietyConstraints += `- The previous question was "${previousGenre}"${previousSubTopic ? ` with sub-topic "${previousSubTopic}"` : ''}. Choose a DIFFERENT sub-topic.\n`;
+        varietyConstraints += `- The previous question was "${previousGenre}"${previousSubTopic ? ` with sub-topic "${previousSubTopic}"` : ''}. Choose a COMPLETELY DIFFERENT concept.\n`;
       }
       if (recentSubTopics && recentSubTopics.length > 0) {
         varietyConstraints += `- DO NOT use any of these recently used sub-topics: ${recentSubTopics.join(', ')}\n`;
       }
-      varietyConstraints += `- Pick a fresh sub-topic that hasn't been used recently.\n`;
+      if (recentCategories.size > 0) {
+        varietyConstraints += `- AVOID these concept categories entirely (they've been used recently): ${Array.from(recentCategories).join(', ')}\n`;
+        varietyConstraints += `- For example, if "perimeter" is listed, do NOT pick perimeter-triangles, perimeter-irregular, etc.\n`;
+      }
+      varietyConstraints += `- Pick a FRESH concept that is fundamentally different from recent questions.\n`;
     }
 
     prompt = `Generate a math word problem focusing on ${selectedTopic ? `this topic: ${topicToUse}` : `one of these topics: ${topicList}`}.
