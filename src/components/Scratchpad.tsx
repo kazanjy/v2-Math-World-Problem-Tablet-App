@@ -9,11 +9,13 @@ interface ScratchpadProps {
   disabled?: boolean;
 }
 
+type Tool = 'pen' | 'eraser';
+
 export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function Scratchpad({ onClear, disabled }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [isErasing, setIsErasing] = useState(false);
+  const [tool, setTool] = useState<Tool>('pen');
   const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -63,16 +65,6 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
 
   // Check if stylus eraser button is pressed (barrel button)
   const isEraserButton = useCallback((e: React.PointerEvent | PointerEvent): boolean => {
-    // Debug logging to help diagnose stylus events
-    if (e.pointerType === 'pen') {
-      console.log('Stylus event:', {
-        button: e.button,
-        buttons: e.buttons,
-        pointerType: e.pointerType,
-        pressure: e.pressure,
-      });
-    }
-
     // Android S Pen and most tablet styluses:
     // - Barrel button press: button === 2 (on pointerdown) or buttons & 2 (during move)
     // - Some devices use button === 5 or buttons & 32
@@ -84,14 +76,17 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     return isBarrelButton || isEraserType || isButton5;
   }, []);
 
+  // Determine if we should erase based on tool selection OR stylus button
+  const shouldErase = useCallback((e: React.PointerEvent | PointerEvent): boolean => {
+    return tool === 'eraser' || isEraserButton(e);
+  }, [tool, isEraserButton]);
+
   const startDrawing = useCallback((e: React.PointerEvent) => {
     if (disabled || !context) return;
 
     e.preventDefault();
 
-    // Check if eraser button is pressed
-    const erasing = isEraserButton(e);
-    setIsErasing(erasing);
+    const erasing = shouldErase(e);
     setIsDrawing(true);
 
     const point = getPointerPosition(e);
@@ -110,24 +105,20 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     context.beginPath();
     context.arc(point.x, point.y, erasing ? 10 : 1.5, 0, Math.PI * 2);
     context.fill();
-  }, [disabled, context, getPointerPosition, isEraserButton]);
+  }, [disabled, context, getPointerPosition, shouldErase]);
 
   const draw = useCallback((e: React.PointerEvent) => {
     if (!isDrawing || disabled || !context || !lastPointRef.current) return;
 
     e.preventDefault();
 
-    // Check if eraser button state changed mid-stroke
-    const erasing = isEraserButton(e);
-    if (erasing !== isErasing) {
-      setIsErasing(erasing);
-      if (erasing) {
-        context.globalCompositeOperation = 'destination-out';
-        context.lineWidth = 20;
-      } else {
-        context.globalCompositeOperation = 'source-over';
-        context.lineWidth = 3;
-      }
+    const erasing = shouldErase(e);
+    if (erasing) {
+      context.globalCompositeOperation = 'destination-out';
+      context.lineWidth = 20;
+    } else {
+      context.globalCompositeOperation = 'source-over';
+      context.lineWidth = 3;
     }
 
     const point = getPointerPosition(e);
@@ -138,7 +129,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     context.stroke();
 
     lastPointRef.current = point;
-  }, [isDrawing, isErasing, disabled, context, getPointerPosition, isEraserButton]);
+  }, [isDrawing, disabled, context, getPointerPosition, shouldErase]);
 
   const stopDrawing = useCallback(() => {
     setIsDrawing(false);
@@ -163,11 +154,12 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     const handlePointerMove = (e: PointerEvent) => {
       if (!isDrawing || disabled || !context || !lastPointRef.current) return;
 
-      // Check for eraser button (Android barrel button is button 2 / buttons & 2)
+      // Check for eraser mode (tool selection OR stylus button)
       const isBarrelButton = e.button === 2 || (e.buttons & 2) !== 0;
       const isEraserType = e.pointerType === 'eraser';
       const isButton5 = e.button === 5 || (e.buttons & 32) !== 0;
-      const erasing = isBarrelButton || isEraserType || isButton5;
+      const erasing = tool === 'eraser' || isBarrelButton || isEraserType || isButton5;
+
       if (erasing) {
         context.globalCompositeOperation = 'destination-out';
         context.lineWidth = 20;
@@ -186,7 +178,6 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
 
     const handlePointerUp = () => {
       setIsDrawing(false);
-      setIsErasing(false);
       lastPointRef.current = null;
     };
 
@@ -201,13 +192,45 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
       document.removeEventListener('pointerup', handlePointerUp);
       document.removeEventListener('pointercancel', handlePointerUp);
     };
-  }, [isDrawing, disabled, context, getPointerPosition]);
+  }, [isDrawing, disabled, context, getPointerPosition, tool]);
 
   return (
     <div className="relative flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex justify-between items-center p-2 bg-gray-100 rounded-t-xl">
-        <span className="text-sm font-medium text-gray-600">Scratch Paper</span>
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-medium text-gray-600 mr-2">Scratch Paper</span>
+          {/* Pen tool */}
+          <button
+            onClick={() => setTool('pen')}
+            disabled={disabled}
+            className={`p-2 rounded-lg transition-all ${
+              tool === 'pen'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
+            } disabled:opacity-50`}
+            title="Pen"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
+          {/* Eraser tool */}
+          <button
+            onClick={() => setTool('eraser')}
+            disabled={disabled}
+            className={`p-2 rounded-lg transition-all ${
+              tool === 'eraser'
+                ? 'bg-pink-500 text-white'
+                : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
+            } disabled:opacity-50`}
+            title="Eraser"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M16.24 3.56l4.95 4.94c.78.79.78 2.05 0 2.84L12 20.53a4.008 4.008 0 01-5.66 0L2.81 17c-.78-.79-.78-2.05 0-2.84l10.6-10.6c.79-.78 2.05-.78 2.83 0zm-1.41 1.42L6.93 12.87l4.24 4.24 7.87-7.87-4.21-4.26z" />
+            </svg>
+          </button>
+        </div>
         <button
           onClick={handleClear}
           disabled={disabled}
@@ -230,7 +253,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
           onPointerUp={stopDrawing}
           onPointerLeave={stopDrawing}
           onContextMenu={(e) => e.preventDefault()}
-          className={`w-full h-full ${disabled ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
+          className={`w-full h-full ${disabled ? 'cursor-not-allowed' : tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'}`}
           style={{
             touchAction: 'none',
             background: 'repeating-linear-gradient(0deg, transparent, transparent 19px, #e5e7eb 19px, #e5e7eb 20px), repeating-linear-gradient(90deg, transparent, transparent 19px, #e5e7eb 19px, #e5e7eb 20px)',
