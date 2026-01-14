@@ -195,7 +195,7 @@ export function PlayPage() {
         </div>
 
         {/* Scratchpad */}
-        <div className="h-[400px]">
+        <div className="h-[520px]">
           <Scratchpad ref={scratchpadRef} disabled={feedback.show || isGenerating} />
         </div>
 
