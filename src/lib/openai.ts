@@ -164,6 +164,11 @@ Respond in JSON format exactly like this:
 }`;
   }
 
+  // Log the full prompt for debugging
+  console.log('=== QUESTION GENERATION PROMPT ===');
+  console.log(prompt);
+  console.log('=================================');
+
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-5.2',
