@@ -5,6 +5,7 @@ export type Theme =
   | 'princesses'
   | 'pokemon'
   | 'minecraft'
+  | 'lego'
   | 'standard'
   | 'custom';
 
@@ -14,6 +15,7 @@ export const THEME_LABELS: Record<Theme, string> = {
   princesses: 'Princesses',
   pokemon: 'Pokémon',
   minecraft: 'Minecraft',
+  lego: 'Lego',
   standard: 'Standard',
   custom: 'Custom',
 };
