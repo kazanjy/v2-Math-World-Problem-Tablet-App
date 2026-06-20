@@ -160,6 +160,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         customTheme: config.customTheme,
         gradeLevel: config.gradeLevel,
         topics: config.topics,
+        topicDifficulties: config.topicDifficulties,
         sessionType: config.sessionType,
         sessionValue: config.sessionType === 'count' ? config.questionCount! : config.timeMinutes!,
         mode: config.mode,

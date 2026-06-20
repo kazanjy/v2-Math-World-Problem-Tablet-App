@@ -138,12 +138,20 @@ export function ConfigPage() {
             <h1 className="text-2xl font-bold text-white">Michael's Math Gymnasium</h1>
             <p className="text-blue-100">Welcome, {profile?.displayName}!</p>
           </div>
-          <button
-            onClick={logout}
-            className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            Sign Out
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/history')}
+              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              History
+            </button>
+            <button
+              onClick={logout}
+              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
 
         {/* Configuration Card */}

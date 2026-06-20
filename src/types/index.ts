@@ -143,6 +143,7 @@ export interface Session {
   customTheme?: string;
   gradeLevel?: GradeLevel;
   topics?: Topic[];
+  topicDifficulties?: TopicDifficultySettings; // Per-topic difficulty settings (topics mode)
   sessionType: SessionType;
   sessionValue: number; // question count or minutes
   mode: SessionMode;
@@ -150,6 +151,22 @@ export interface Session {
   endedAt?: Date;
   totalCorrect: number;
   totalAttempted: number;
+}
+
+// Rebuild a session configuration from a past session record, so a previous
+// session can be re-run with the exact same settings.
+export function sessionToConfig(session: Session): SessionConfig {
+  return {
+    theme: session.theme,
+    customTheme: session.customTheme,
+    gradeLevel: session.gradeLevel,
+    topics: session.topics,
+    topicDifficulties: session.topicDifficulties,
+    sessionType: session.sessionType,
+    questionCount: session.sessionType === 'count' ? session.sessionValue : undefined,
+    timeMinutes: session.sessionType === 'timed' ? session.sessionValue : undefined,
+    mode: session.mode,
+  };
 }
 
 // User profile

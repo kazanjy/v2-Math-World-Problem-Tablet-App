@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ConfigPage } from './pages/ConfigPage';
 import { PlayPage } from './pages/PlayPage';
 import { SummaryPage } from './pages/SummaryPage';
+import { HistoryPage } from './pages/HistoryPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading, isInitialized } = useAuthStore();
@@ -87,6 +88,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SummaryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <ProtectedRoute>
+              <HistoryPage />
             </ProtectedRoute>
           }
         />
