@@ -242,6 +242,39 @@ Respond in JSON format exactly like this:
   }
 }
 
+// Recognize a single handwritten answer from a canvas image (data URL) using
+// OpenAI vision. Returns the parsed value as a string (e.g. "42", "3/4",
+// "-1.5"), or an empty string if nothing legible was found.
+export async function recognizeHandwrittenAnswer(imageDataUrl: string): Promise<string> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-5.2',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You read a single handwritten math answer from an image. Respond with ONLY the value the student wrote — digits, an optional leading minus sign, a decimal point, or a fraction like "3/4" (or a mixed number like "1 1/2"). Do not include words, units, or explanation. If nothing is legible, respond with an empty string.',
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'What value is written here?' },
+            { type: 'image_url', image_url: { url: imageDataUrl } },
+          ],
+        },
+      ],
+    });
+
+    const raw = (response.choices[0]?.message?.content || '').trim();
+    // Safety net: if stray words slipped in, pull out the numeric/fraction value.
+    const match = raw.match(/-?\d+\s+\d+\/\d+|-?\d+\/\d+|-?\d*\.?\d+/);
+    return match ? match[0] : raw;
+  } catch (error) {
+    console.error('Error recognizing handwritten answer:', error);
+    return '';
+  }
+}
+
 // Helper to normalize answers for comparison
 export function normalizeAnswer(answer: string): string {
   // Remove extra whitespace and lowercase

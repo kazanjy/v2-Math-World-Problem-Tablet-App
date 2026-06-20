@@ -4,7 +4,12 @@ import { useSessionStore } from '../stores/sessionStore';
 import { NumericKeypad } from '../components/NumericKeypad';
 import { Scratchpad } from '../components/Scratchpad';
 import type { ScratchpadHandle } from '../components/Scratchpad';
+import { AnswerPad } from '../components/AnswerPad';
+import type { AnswerPadHandle } from '../components/AnswerPad';
+import { recognizeHandwrittenAnswer } from '../lib/openai';
 import { getKeypadConfig } from '../types';
+
+type InputMode = 'write' | 'keypad';
 
 interface FeedbackState {
   show: boolean;
@@ -36,7 +41,11 @@ export function PlayPage() {
   } = useSessionStore();
 
   const [answer, setAnswer] = useState('');
+  const [inputMode, setInputMode] = useState<InputMode>('write');
+  const [isRecognizing, setIsRecognizing] = useState(false);
+  const [recognizeError, setRecognizeError] = useState('');
   const scratchpadRef = useRef<ScratchpadHandle>(null);
+  const answerPadRef = useRef<AnswerPadHandle>(null);
   const [feedback, setFeedback] = useState<FeedbackState>({
     show: false,
     isCorrect: false,
@@ -88,16 +97,16 @@ export function PlayPage() {
     // This is handled after answering in handleSubmit
   }, [config, questionNumber]);
 
-  const handleSubmit = useCallback(async () => {
-    if (!answer.trim() || isSubmitting) return;
+  const submitValue = useCallback(async (value: string) => {
+    if (!value.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
-    const result = await submitAnswer(answer);
+    const result = await submitAnswer(value);
 
     setFeedback({
       show: true,
       isCorrect: result.isCorrect,
-      userAnswer: answer,
+      userAnswer: value,
       correctAnswer: result.correctAnswer,
       explanation: result.explanation,
       genre: result.genre,
@@ -107,11 +116,37 @@ export function PlayPage() {
     });
 
     setIsSubmitting(false);
-  }, [answer, submitAnswer, isSubmitting]);
+  }, [submitAnswer, isSubmitting]);
+
+  // Keypad submit
+  const handleSubmit = useCallback(() => submitValue(answer), [submitValue, answer]);
+
+  // Handwriting submit: read the canvas with vision, then submit the result.
+  const handleSubmitWritten = useCallback(async () => {
+    const pad = answerPadRef.current;
+    if (!pad || pad.isEmpty() || isRecognizing || isSubmitting) return;
+
+    const image = pad.toImageDataUrl();
+    if (!image) return;
+
+    setIsRecognizing(true);
+    setRecognizeError('');
+    try {
+      const recognized = await recognizeHandwrittenAnswer(image);
+      if (!recognized.trim()) {
+        setRecognizeError("Hmm, I couldn't read that. Try writing it a bit more clearly.");
+        return;
+      }
+      await submitValue(recognized);
+    } finally {
+      setIsRecognizing(false);
+    }
+  }, [isRecognizing, isSubmitting, submitValue]);
 
   const handleNext = useCallback(async () => {
     setFeedback({ show: false, isCorrect: false, userAnswer: '', correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '', timeSpent: 0 });
     setAnswer('');
+    setRecognizeError('');
 
     // Clear the scratchpad for the new question
     scratchpadRef.current?.clear();
@@ -137,6 +172,7 @@ export function PlayPage() {
   const handleTrySimilar = useCallback(async () => {
     setFeedback({ show: false, isCorrect: false, userAnswer: '', correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '', timeSpent: 0 });
     setAnswer('');
+    setRecognizeError('');
 
     // Fresh problem, fresh scratch paper
     scratchpadRef.current?.clear();
@@ -296,13 +332,81 @@ export function PlayPage() {
             )}
           </div>
         ) : (
-          <NumericKeypad
-            value={answer}
-            onChange={setAnswer}
-            onSubmit={handleSubmit}
-            config={keypadConfig}
-            disabled={isGenerating || isSubmitting || !currentQuestion}
-          />
+          <div className="bg-gray-100 p-3 rounded-2xl">
+            {/* Input mode tabs */}
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => setInputMode('write')}
+                className={`flex-1 py-2 px-4 rounded-xl font-bold transition-all ${
+                  inputMode === 'write'
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                ✍️ Write
+              </button>
+              <button
+                onClick={() => setInputMode('keypad')}
+                className={`flex-1 py-2 px-4 rounded-xl font-bold transition-all ${
+                  inputMode === 'keypad'
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                ⌨️ Keypad
+              </button>
+            </div>
+
+            {inputMode === 'write' ? (
+              <div>
+                <div className="h-[160px]">
+                  <AnswerPad
+                    ref={answerPadRef}
+                    disabled={isGenerating || isSubmitting || isRecognizing || !currentQuestion}
+                  />
+                </div>
+
+                {recognizeError && (
+                  <p className="mt-2 text-sm text-amber-600">{recognizeError}</p>
+                )}
+
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => {
+                      answerPadRef.current?.clear();
+                      setRecognizeError('');
+                    }}
+                    disabled={isRecognizing || isSubmitting}
+                    className="px-4 py-3 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-bold rounded-xl border border-gray-200 transition-colors"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={handleSubmitWritten}
+                    disabled={isGenerating || isSubmitting || isRecognizing || !currentQuestion}
+                    className="flex-1 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isRecognizing ? (
+                      <>
+                        <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                        Reading your answer…
+                      </>
+                    ) : (
+                      'Submit'
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <NumericKeypad
+                value={answer}
+                onChange={setAnswer}
+                onSubmit={handleSubmit}
+                config={keypadConfig}
+                disabled={isGenerating || isSubmitting || !currentQuestion}
+              />
+            )}
+          </div>
         )}
       </div>
     </div>
