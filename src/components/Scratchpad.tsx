@@ -11,6 +11,10 @@ interface ScratchpadProps {
 
 type Tool = 'pen' | 'eraser';
 
+// Brush sizes in CSS pixels.
+const PEN_WIDTH = 3;
+const ERASER_WIDTH = 44;
+
 export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function Scratchpad({ onClear, disabled }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -18,6 +22,10 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   const [tool, setTool] = useState<Tool>('pen');
   const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  // Once a stylus is detected we reject touch input (palm rejection).
+  const hasSeenPenRef = useRef(false);
+  // Where the eraser ring preview is drawn (null = hidden).
+  const [eraserCursor, setEraserCursor] = useState<{ x: number; y: number } | null>(null);
 
   // Initialize canvas
   useEffect(() => {
@@ -81,6 +89,16 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     };
   }, []);
 
+  // Remember when a stylus is in use, and reject palm/finger touches once it is.
+  // Pen events (including hover) flip the flag, so the palm is ignored even if
+  // it lands on the screen before the pen tip does.
+  const isPalmTouch = useCallback((e: React.PointerEvent | PointerEvent): boolean => {
+    if (e.pointerType === 'pen') {
+      hasSeenPenRef.current = true;
+    }
+    return e.pointerType === 'touch' && hasSeenPenRef.current;
+  }, []);
+
   // Check if stylus eraser button is pressed (barrel button)
   const isEraserButton = useCallback((e: React.PointerEvent | PointerEvent): boolean => {
     // Android S Pen and most tablet styluses:
@@ -100,7 +118,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   }, [tool, isEraserButton]);
 
   const startDrawing = useCallback((e: React.PointerEvent) => {
-    if (disabled || !context) return;
+    if (disabled || !context || isPalmTouch(e)) return;
 
     e.preventDefault();
 
@@ -113,30 +131,30 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     // Set drawing mode based on eraser state
     if (erasing) {
       context.globalCompositeOperation = 'destination-out';
-      context.lineWidth = 20; // Wider for erasing
+      context.lineWidth = ERASER_WIDTH; // Wider for erasing
     } else {
       context.globalCompositeOperation = 'source-over';
-      context.lineWidth = 3;
+      context.lineWidth = PEN_WIDTH;
     }
 
     // Draw a dot for single clicks
     context.beginPath();
-    context.arc(point.x, point.y, erasing ? 10 : 1.5, 0, Math.PI * 2);
+    context.arc(point.x, point.y, erasing ? ERASER_WIDTH / 2 : 1.5, 0, Math.PI * 2);
     context.fill();
-  }, [disabled, context, getPointerPosition, shouldErase]);
+  }, [disabled, context, getPointerPosition, shouldErase, isPalmTouch]);
 
   const draw = useCallback((e: React.PointerEvent) => {
-    if (!isDrawing || disabled || !context || !lastPointRef.current) return;
+    if (!isDrawing || disabled || !context || !lastPointRef.current || isPalmTouch(e)) return;
 
     e.preventDefault();
 
     const erasing = shouldErase(e);
     if (erasing) {
       context.globalCompositeOperation = 'destination-out';
-      context.lineWidth = 20;
+      context.lineWidth = ERASER_WIDTH;
     } else {
       context.globalCompositeOperation = 'source-over';
-      context.lineWidth = 3;
+      context.lineWidth = PEN_WIDTH;
     }
 
     const point = getPointerPosition(e);
@@ -147,7 +165,25 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     context.stroke();
 
     lastPointRef.current = point;
-  }, [isDrawing, disabled, context, getPointerPosition, shouldErase]);
+  }, [isDrawing, disabled, context, getPointerPosition, shouldErase, isPalmTouch]);
+
+  // Canvas pointer move: update the eraser preview ring (even while hovering)
+  // and forward to the drawing handler.
+  const handleCanvasPointerMove = useCallback((e: React.PointerEvent) => {
+    if (isPalmTouch(e)) return;
+
+    if (tool === 'eraser') {
+      setEraserCursor(getPointerPosition(e));
+    }
+
+    draw(e);
+  }, [tool, getPointerPosition, draw, isPalmTouch]);
+
+  const handleCanvasPointerLeave = useCallback(() => {
+    setEraserCursor(null);
+    setIsDrawing(false);
+    lastPointRef.current = null;
+  }, []);
 
   const stopDrawing = useCallback(() => {
     setIsDrawing(false);
@@ -172,6 +208,9 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     const handlePointerMove = (e: PointerEvent) => {
       if (!isDrawing || disabled || !context || !lastPointRef.current) return;
 
+      // Ignore palm/finger touches once a stylus is in use.
+      if (e.pointerType === 'touch' && hasSeenPenRef.current) return;
+
       // Check for eraser mode (tool selection OR stylus button)
       const isBarrelButton = e.button === 2 || (e.buttons & 2) !== 0;
       const isEraserType = e.pointerType === 'eraser';
@@ -180,10 +219,10 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
 
       if (erasing) {
         context.globalCompositeOperation = 'destination-out';
-        context.lineWidth = 20;
+        context.lineWidth = ERASER_WIDTH;
       } else {
         context.globalCompositeOperation = 'source-over';
-        context.lineWidth = 3;
+        context.lineWidth = PEN_WIDTH;
       }
 
       const point = getPointerPosition(e);
@@ -261,22 +300,35 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
       {/* Canvas */}
       <div
         ref={containerRef}
-        className="flex-1 bg-white border-2 border-gray-200 rounded-b-xl overflow-hidden"
+        className="relative flex-1 bg-white border-2 border-gray-200 rounded-b-xl overflow-hidden"
         style={{ touchAction: 'none' }}
       >
         <canvas
           ref={canvasRef}
           onPointerDown={startDrawing}
-          onPointerMove={draw}
+          onPointerMove={handleCanvasPointerMove}
           onPointerUp={stopDrawing}
-          onPointerLeave={stopDrawing}
+          onPointerLeave={handleCanvasPointerLeave}
           onContextMenu={(e) => e.preventDefault()}
-          className={`w-full h-full ${disabled ? 'cursor-not-allowed' : tool === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'}`}
+          className={`w-full h-full ${disabled ? 'cursor-not-allowed' : tool === 'eraser' ? 'cursor-none' : 'cursor-crosshair'}`}
           style={{
             touchAction: 'none',
             background: 'repeating-linear-gradient(0deg, transparent, transparent 19px, #e5e7eb 19px, #e5e7eb 20px), repeating-linear-gradient(90deg, transparent, transparent 19px, #e5e7eb 19px, #e5e7eb 20px)',
           }}
         />
+
+        {/* Eraser preview ring - shows where the eraser will act, even on hover */}
+        {tool === 'eraser' && eraserCursor && !disabled && (
+          <div
+            className="pointer-events-none absolute rounded-full border-2 border-pink-400 bg-pink-300/20"
+            style={{
+              width: ERASER_WIDTH,
+              height: ERASER_WIDTH,
+              left: eraserCursor.x - ERASER_WIDTH / 2,
+              top: eraserCursor.y - ERASER_WIDTH / 2,
+            }}
+          />
+        )}
       </div>
     </div>
   );
