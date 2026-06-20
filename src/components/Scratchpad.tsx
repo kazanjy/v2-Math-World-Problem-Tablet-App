@@ -29,9 +29,21 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     const resizeCanvas = () => {
       const rect = container.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
+      const newWidth = Math.round(rect.width * dpr);
+      const newHeight = Math.round(rect.height * dpr);
 
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+      // Bail out if the size hasn't actually changed. Touch devices fire
+      // window "resize" events while scrolling (the address bar shows/hides),
+      // and reassigning canvas.width/height would wipe the drawing every time.
+      if (canvas.width === newWidth && canvas.height === newHeight) {
+        return;
+      }
+
+      // Preserve the existing drawing across a genuine resize.
+      const snapshot = canvas.width > 0 && canvas.height > 0 ? canvas.toDataURL() : null;
+
+      canvas.width = newWidth;
+      canvas.height = newHeight;
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
 
@@ -43,6 +55,12 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         setContext(ctx);
+
+        if (snapshot) {
+          const img = new Image();
+          img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+          img.src = snapshot;
+        }
       }
     };
 

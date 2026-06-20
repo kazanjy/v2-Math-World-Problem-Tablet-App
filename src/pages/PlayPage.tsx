@@ -205,9 +205,9 @@ export function PlayPage() {
           )}
         </div>
 
-        {/* Scratchpad - stays usable after a wrong answer so the student can keep working */}
+        {/* Scratchpad - stays usable while reviewing feedback so the student can keep working */}
         <div className="h-[520px]">
-          <Scratchpad ref={scratchpadRef} disabled={(feedback.show && feedback.isCorrect) || isGenerating} />
+          <Scratchpad ref={scratchpadRef} disabled={isGenerating} />
         </div>
 
         {/* Feedback or Keypad */}
