@@ -25,6 +25,7 @@ export function PlayPage() {
     session,
     currentQuestion,
     questionNumber,
+    questions,
     timeRemaining,
     isGenerating,
     tick,
@@ -161,6 +162,13 @@ export function PlayPage() {
   const keypadConfig = getKeypadConfig(config.gradeLevel, config.topics);
   const isTimedAndExpired = config.sessionType === 'timed' && timeRemaining !== null && timeRemaining <= 0;
   const canContinue = config.mode === 'chill' || !isTimedAndExpired;
+  // The question just answered is already counted in `questions`, so once we've
+  // hit the configured count the session is complete.
+  const reachedQuestionCount =
+    config.sessionType === 'count' && config.questionCount != null && questions.length >= config.questionCount;
+  // When the session is over there's no room for another question, so the
+  // "do another like this" option is hidden and only results remain.
+  const sessionAtEnd = reachedQuestionCount || isTimedAndExpired;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-500 to-purple-600 flex flex-col">
@@ -263,19 +271,19 @@ export function PlayPage() {
 
             {canContinue ? (
               <div className="flex flex-col gap-2">
-                {!feedback.isCorrect && !isTimedAndExpired && (
+                {!sessionAtEnd && (
                   <button
                     onClick={handleTrySimilar}
                     className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-xl transition-colors"
                   >
-                    🔄 Try a Similar One
+                    🔄 {feedback.isCorrect ? 'Do Another Like This' : 'Try a Similar One'}
                   </button>
                 )}
                 <button
                   onClick={handleNext}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors"
                 >
-                  {isTimedAndExpired ? 'See Results' : 'Next Question'}
+                  {sessionAtEnd ? 'See Results' : 'Next Question'}
                 </button>
               </div>
             ) : (
