@@ -20,10 +20,13 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<Tool>('pen');
-  const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
+  // The 2D context is held in a ref: it's a mutable drawing handle, not render state.
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   // Once a stylus is detected we reject touch input (palm rejection).
   const hasSeenPenRef = useRef(false);
+  // Manual override: when on, touch is always ignored regardless of detection.
+  const [stylusOnly, setStylusOnly] = useState(false);
   // Where the eraser ring preview is drawn (null = hidden).
   const [eraserCursor, setEraserCursor] = useState<{ x: number; y: number } | null>(null);
 
@@ -62,7 +65,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
         ctx.lineWidth = 3;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        setContext(ctx);
+        contextRef.current = ctx;
 
         if (snapshot) {
           const img = new Image();
@@ -89,15 +92,17 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     };
   }, []);
 
-  // Remember when a stylus is in use, and reject palm/finger touches once it is.
-  // Pen events (including hover) flip the flag, so the palm is ignored even if
-  // it lands on the screen before the pen tip does.
+  // Remember when a stylus is in use, and reject palm/finger touches.
+  // Pen events (including hover) flip the auto-detect flag, so the palm is
+  // ignored even if it lands on the screen before the pen tip does. The manual
+  // "stylus only" toggle forces rejection regardless of detection.
   const isPalmTouch = useCallback((e: React.PointerEvent | PointerEvent): boolean => {
     if (e.pointerType === 'pen') {
       hasSeenPenRef.current = true;
     }
-    return e.pointerType === 'touch' && hasSeenPenRef.current;
-  }, []);
+    if (e.pointerType !== 'touch') return false;
+    return stylusOnly || hasSeenPenRef.current;
+  }, [stylusOnly]);
 
   // Check if stylus eraser button is pressed (barrel button)
   const isEraserButton = useCallback((e: React.PointerEvent | PointerEvent): boolean => {
@@ -118,6 +123,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   }, [tool, isEraserButton]);
 
   const startDrawing = useCallback((e: React.PointerEvent) => {
+    const context = contextRef.current;
     if (disabled || !context || isPalmTouch(e)) return;
 
     e.preventDefault();
@@ -141,9 +147,10 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     context.beginPath();
     context.arc(point.x, point.y, erasing ? ERASER_WIDTH / 2 : 1.5, 0, Math.PI * 2);
     context.fill();
-  }, [disabled, context, getPointerPosition, shouldErase, isPalmTouch]);
+  }, [disabled, getPointerPosition, shouldErase, isPalmTouch]);
 
   const draw = useCallback((e: React.PointerEvent) => {
+    const context = contextRef.current;
     if (!isDrawing || disabled || !context || !lastPointRef.current || isPalmTouch(e)) return;
 
     e.preventDefault();
@@ -165,7 +172,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     context.stroke();
 
     lastPointRef.current = point;
-  }, [isDrawing, disabled, context, getPointerPosition, shouldErase, isPalmTouch]);
+  }, [isDrawing, disabled, getPointerPosition, shouldErase, isPalmTouch]);
 
   // Canvas pointer move: update the eraser preview ring (even while hovering)
   // and forward to the drawing handler.
@@ -192,11 +199,12 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
 
   const handleClear = useCallback(() => {
     const canvas = canvasRef.current;
+    const context = contextRef.current;
     if (!canvas || !context) return;
 
     context.clearRect(0, 0, canvas.width, canvas.height);
     onClear?.();
-  }, [context, onClear]);
+  }, [onClear]);
 
   // Expose clear function via ref
   useImperativeHandle(ref, () => ({
@@ -206,10 +214,11 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   // Handle pointer events at the document level for smooth drawing
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
+      const context = contextRef.current;
       if (!isDrawing || disabled || !context || !lastPointRef.current) return;
 
-      // Ignore palm/finger touches once a stylus is in use.
-      if (e.pointerType === 'touch' && hasSeenPenRef.current) return;
+      // Ignore palm/finger touches when a stylus is in use (or forced).
+      if (e.pointerType === 'touch' && (stylusOnly || hasSeenPenRef.current)) return;
 
       // Check for eraser mode (tool selection OR stylus button)
       const isBarrelButton = e.button === 2 || (e.buttons & 2) !== 0;
@@ -249,7 +258,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
       document.removeEventListener('pointerup', handlePointerUp);
       document.removeEventListener('pointercancel', handlePointerUp);
     };
-  }, [isDrawing, disabled, context, getPointerPosition, tool]);
+  }, [isDrawing, disabled, getPointerPosition, tool, stylusOnly]);
 
   return (
     <div className="relative flex flex-col h-full">
@@ -285,6 +294,23 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M16.24 3.56l4.95 4.94c.78.79.78 2.05 0 2.84L12 20.53a4.008 4.008 0 01-5.66 0L2.81 17c-.78-.79-.78-2.05 0-2.84l10.6-10.6c.79-.78 2.05-.78 2.83 0zm-1.41 1.42L6.93 12.87l4.24 4.24 7.87-7.87-4.21-4.26z" />
+            </svg>
+          </button>
+          {/* Divider */}
+          <div className="w-px h-6 bg-gray-300 mx-1" />
+          {/* Stylus-only (palm rejection) toggle */}
+          <button
+            onClick={() => setStylusOnly((v) => !v)}
+            disabled={disabled}
+            className={`p-2 rounded-lg transition-all ${
+              stylusOnly
+                ? 'bg-indigo-500 text-white'
+                : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
+            } disabled:opacity-50`}
+            title={stylusOnly ? 'Stylus only: ON — touch/palm ignored' : 'Stylus only: OFF — tap to ignore touch/palm'}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.05 4.575a1.575 1.575 0 1 0-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 0 1 3.15 0v1.5m-3.15 0 .075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 0 1 3.15 0V15M6.9 7.575a1.575 1.575 0 1 0-3.15 0v8.175a6.75 6.75 0 0 0 6.75 6.75h2.018a5.25 5.25 0 0 0 3.712-1.538l1.732-1.732a5.25 5.25 0 0 0 1.538-3.712l.003-2.024a.668.668 0 0 1 .198-.471 1.575 1.575 0 1 0-2.228-2.228 3.818 3.818 0 0 0-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0 1 16.35 15m.002 0h-.002" />
             </svg>
           </button>
         </div>
