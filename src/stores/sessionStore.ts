@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SessionConfig, Session, Question, GeneratedQuestion } from '../types';
+import type { SessionConfig, Session, Question, GeneratedQuestion, Topic } from '../types';
 import { generateQuestion, checkAnswer } from '../lib/openai';
 import { createSession, saveQuestion, updateQuestion, updateSession } from '../lib/supabase';
 import {
@@ -18,6 +18,51 @@ const shouldUseLocalStorage = () => {
     import.meta.env.VITE_SUPABASE_URL === 'https://placeholder.supabase.co';
   const isUsingDemoLogin = useAuthStore.getState().isUsingDemoLogin;
   return isDemoMode || isUsingDemoLogin;
+};
+
+// Persist a generated question to Supabase (or localStorage in demo mode) and
+// return the saved Question record.
+const persistGeneratedQuestion = async (
+  sessionId: string,
+  generated: GeneratedQuestion,
+  questionOrder: number
+): Promise<Question> => {
+  let savedQuestion: Question | null = null;
+
+  if (!shouldUseLocalStorage()) {
+    savedQuestion = await saveQuestion({
+      sessionId,
+      questionText: generated.question,
+      correctAnswer: generated.answer,
+      explanation: generated.explanation,
+      genre: generated.genre,
+      subTopic: generated.subTopic,
+      difficulty: generated.difficulty,
+      questionOrder,
+    });
+  }
+
+  // Demo mode or Supabase fallback: create local question
+  if (!savedQuestion) {
+    savedQuestion = {
+      id: `demo-q-${Date.now()}-${questionOrder}`,
+      sessionId,
+      questionText: generated.question,
+      correctAnswer: generated.answer,
+      explanation: generated.explanation,
+      genre: generated.genre,
+      subTopic: generated.subTopic,
+      difficulty: generated.difficulty,
+      questionOrder,
+      createdAt: new Date(),
+    };
+
+    if (shouldUseLocalStorage()) {
+      saveLocalQuestion(savedQuestion);
+    }
+  }
+
+  return savedQuestion;
 };
 
 interface RetryItem {
@@ -58,6 +103,7 @@ interface SessionState {
   setConfig: (config: SessionConfig) => void;
   startSession: (userId: string) => Promise<void>;
   nextQuestion: () => Promise<void>;
+  tryAgainSimilar: () => Promise<void>;
   submitAnswer: (userAnswer: string) => Promise<{ isCorrect: boolean; correctAnswer: string; explanation: string; genre: string; subTopic: string; difficulty: string; timeSpent: number }>;
   endSession: () => Promise<void>;
   tick: () => void; // For timer
@@ -162,7 +208,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const previousSubTopic = lastQuestion?.subTopic;
 
     // Randomly select a topic when multiple are enabled (for variety)
-    let selectedTopic: typeof config.topics extends (infer T)[] ? T : never | undefined;
+    let selectedTopic: Topic | undefined;
     if (config.topics && config.topics.length > 1 && !isRetry) {
       const randomIndex = Math.floor(Math.random() * config.topics.length);
       selectedTopic = config.topics[randomIndex];
@@ -184,42 +230,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         retryGenre: retryItem?.genre,
       });
 
-      let savedQuestion: Question | null = null;
-
-      if (!shouldUseLocalStorage()) {
-        // Try Supabase first
-        savedQuestion = await saveQuestion({
-          sessionId: session.id,
-          questionText: generated.question,
-          correctAnswer: generated.answer,
-          explanation: generated.explanation,
-          genre: generated.genre,
-          subTopic: generated.subTopic,
-          difficulty: generated.difficulty,
-          questionOrder: nextNumber,
-        });
-      }
-
-      // Demo mode or fallback: create local question
-      if (!savedQuestion) {
-        savedQuestion = {
-          id: `demo-q-${Date.now()}-${nextNumber}`,
-          sessionId: session.id,
-          questionText: generated.question,
-          correctAnswer: generated.answer,
-          explanation: generated.explanation,
-          genre: generated.genre,
-          subTopic: generated.subTopic,
-          difficulty: generated.difficulty,
-          questionOrder: nextNumber,
-          createdAt: new Date(),
-        };
-
-        // Persist to localStorage in demo mode
-        if (shouldUseLocalStorage()) {
-          saveLocalQuestion(savedQuestion);
-        }
-      }
+      const savedQuestion = await persistGeneratedQuestion(session.id, generated, nextNumber);
 
       // Update recent sub-topics (keep last 5)
       const newRecentSubTopics = [...recentSubTopics, generated.subTopic].slice(-5);
@@ -232,6 +243,41 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       });
     } catch (error) {
       console.error('Error generating question:', error);
+      set({ isGenerating: false });
+    }
+  },
+
+  // Generate a fresh question testing the same concept as the one just answered,
+  // so the student can immediately "try again" with a similar but different problem.
+  tryAgainSimilar: async () => {
+    const { config, session, currentQuestion, questionNumber } = get();
+    if (!config || !session || !currentQuestion) return;
+
+    set({ isGenerating: true, questionStartTime: new Date() });
+
+    const nextNumber = questionNumber + 1;
+
+    try {
+      const generated = await generateQuestion({
+        theme: config.theme,
+        customTheme: config.customTheme,
+        gradeLevel: config.gradeLevel,
+        topics: config.topics,
+        topicDifficulties: config.topicDifficulties,
+        isRetry: true,
+        retryGenre: currentQuestion.genre,
+        retrySubTopic: currentQuestion.subTopic,
+      });
+
+      const savedQuestion = await persistGeneratedQuestion(session.id, generated, nextNumber);
+
+      set({
+        currentQuestion: { ...savedQuestion, generated },
+        questionNumber: nextNumber,
+        isGenerating: false,
+      });
+    } catch (error) {
+      console.error('Error generating similar question:', error);
       set({ isGenerating: false });
     }
   },

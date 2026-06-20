@@ -30,6 +30,7 @@ export function PlayPage() {
     tick,
     submitAnswer,
     nextQuestion,
+    tryAgainSimilar,
     endSession,
   } = useSessionStore();
 
@@ -132,6 +133,16 @@ export function PlayPage() {
     await nextQuestion();
   }, [nextQuestion, timeRemaining]);
 
+  const handleTrySimilar = useCallback(async () => {
+    setFeedback({ show: false, isCorrect: false, userAnswer: '', correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '', timeSpent: 0 });
+    setAnswer('');
+
+    // Fresh problem, fresh scratch paper
+    scratchpadRef.current?.clear();
+
+    await tryAgainSimilar();
+  }, [tryAgainSimilar]);
+
   const handleEndSession = async () => {
     await endSession();
     navigate('/summary');
@@ -194,9 +205,9 @@ export function PlayPage() {
           )}
         </div>
 
-        {/* Scratchpad */}
+        {/* Scratchpad - stays usable after a wrong answer so the student can keep working */}
         <div className="h-[520px]">
-          <Scratchpad ref={scratchpadRef} disabled={feedback.show || isGenerating} />
+          <Scratchpad ref={scratchpadRef} disabled={(feedback.show && feedback.isCorrect) || isGenerating} />
         </div>
 
         {/* Feedback or Keypad */}
@@ -251,12 +262,22 @@ export function PlayPage() {
             </div>
 
             {canContinue ? (
-              <button
-                onClick={handleNext}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors"
-              >
-                {isTimedAndExpired ? 'See Results' : 'Next Question'}
-              </button>
+              <div className="flex flex-col gap-2">
+                {!feedback.isCorrect && !isTimedAndExpired && (
+                  <button
+                    onClick={handleTrySimilar}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-xl transition-colors"
+                  >
+                    🔄 Try a Similar One
+                  </button>
+                )}
+                <button
+                  onClick={handleNext}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors"
+                >
+                  {isTimedAndExpired ? 'See Results' : 'Next Question'}
+                </button>
+              </div>
             ) : (
               <button
                 onClick={handleEndSession}

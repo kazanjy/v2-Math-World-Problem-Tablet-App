@@ -26,10 +26,11 @@ interface GenerateQuestionParams {
   selectedTopic?: Topic; // Pre-selected topic (for random selection)
   isRetry?: boolean;
   retryGenre?: string;
+  retrySubTopic?: string; // Sub-topic to match when generating a similar problem
 }
 
 export async function generateQuestion(params: GenerateQuestionParams): Promise<GeneratedQuestion> {
-  const { theme, customTheme, gradeLevel, topics, topicDifficulties, previousQuestion, previousGenre, previousSubTopic, recentSubTopics, selectedTopic, isRetry, retryGenre } = params;
+  const { theme, customTheme, gradeLevel, topics, topicDifficulties, previousQuestion, previousGenre, previousSubTopic, recentSubTopics, selectedTopic, isRetry, retryGenre, retrySubTopic } = params;
 
   const themeDescription = theme === 'custom' && customTheme
     ? customTheme
@@ -116,8 +117,8 @@ ${theme === 'custom' ? `Use this theme for the story context: ${customTheme}` : 
   }
 
   if (isRetry && retryGenre) {
-    prompt += `The student struggled with this concept: ${retryGenre}
-Generate a similar problem testing the same skill, but with different numbers and context.
+    prompt += `The student struggled with this concept: ${retryGenre}${retrySubTopic && retrySubTopic !== 'general' ? ` (specifically the sub-topic: ${retrySubTopic})` : ''}
+Generate a similar problem testing the same skill at the same difficulty, but with different numbers and a different story context.
 
 `;
   } else if (previousQuestion) {
