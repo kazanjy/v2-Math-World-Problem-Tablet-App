@@ -268,7 +268,7 @@ export function PlayPage() {
                   {feedback.isCorrect ? (
                     <>You answered <strong>{feedback.userAnswer}</strong> which was right!</>
                   ) : (
-                    <>You answered <strong>{feedback.userAnswer}</strong>, but the right answer was <strong>{feedback.correctAnswer}</strong>.</>
+                    <>You answered <strong>{feedback.userAnswer}</strong>, but the right answer was <strong>{formatMathText(feedback.correctAnswer)}</strong>.</>
                   )}
                 </p>
               </div>
