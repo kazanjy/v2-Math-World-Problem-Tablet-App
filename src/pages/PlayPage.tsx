@@ -44,6 +44,7 @@ export function PlayPage() {
   const [inputMode, setInputMode] = useState<InputMode>('write');
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [recognizeError, setRecognizeError] = useState('');
+  const [canUndoWrite, setCanUndoWrite] = useState(false);
   const scratchpadRef = useRef<ScratchpadHandle>(null);
   const answerPadRef = useRef<AnswerPadHandle>(null);
   const [feedback, setFeedback] = useState<FeedbackState>({
@@ -363,6 +364,7 @@ export function PlayPage() {
                   <AnswerPad
                     ref={answerPadRef}
                     disabled={isGenerating || isSubmitting || isRecognizing || !currentQuestion}
+                    onCanUndoChange={setCanUndoWrite}
                   />
                 </div>
 
@@ -371,6 +373,17 @@ export function PlayPage() {
                 )}
 
                 <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => answerPadRef.current?.undo()}
+                    disabled={isRecognizing || isSubmitting || !canUndoWrite}
+                    className="flex items-center gap-1 px-4 py-3 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-bold rounded-xl border border-gray-200 transition-colors"
+                    title="Undo last stroke"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                    </svg>
+                    Undo
+                  </button>
                   <button
                     onClick={() => {
                       answerPadRef.current?.clear();

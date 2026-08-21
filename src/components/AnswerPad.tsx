@@ -2,17 +2,21 @@ import { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardR
 
 export interface AnswerPadHandle {
   clear: () => void;
+  undo: () => void;
   isEmpty: () => boolean;
   toImageDataUrl: () => string | null;
 }
 
 interface AnswerPadProps {
   disabled?: boolean;
+  // Notifies the parent when undo becomes available/unavailable.
+  onCanUndoChange?: (canUndo: boolean) => void;
 }
 
 const PEN_WIDTH = 4;
+const UNDO_LIMIT = 30;
 
-export const AnswerPad = forwardRef<AnswerPadHandle, AnswerPadProps>(function AnswerPad({ disabled }, ref) {
+export const AnswerPad = forwardRef<AnswerPadHandle, AnswerPadProps>(function AnswerPad({ disabled, onCanUndoChange }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -21,7 +25,14 @@ export const AnswerPad = forwardRef<AnswerPadHandle, AnswerPadProps>(function An
   // Once a stylus is detected, ignore touch (palm) input.
   const hasSeenPenRef = useRef(false);
   const hasContentRef = useRef(false);
+  // Undo history: canvas snapshots captured before each stroke (newest last).
+  const undoStackRef = useRef<string[]>([]);
   const [empty, setEmpty] = useState(true);
+
+  // Start with undo unavailable (also resets on remount, i.e. each question).
+  useEffect(() => {
+    onCanUndoChange?.(false);
+  }, [onCanUndoChange]);
 
   // Initialize / resize canvas (preserving the drawing, like the scratchpad).
   useEffect(() => {
@@ -78,6 +89,16 @@ export const AnswerPad = forwardRef<AnswerPadHandle, AnswerPadProps>(function An
     return e.pointerType === 'touch' && hasSeenPenRef.current;
   };
 
+  // Snapshot the canvas so the action that follows can be undone.
+  const pushUndoSnapshot = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const stack = undoStackRef.current;
+    stack.push(canvas.toDataURL());
+    if (stack.length > UNDO_LIMIT) stack.shift();
+    onCanUndoChange?.(true);
+  }, [onCanUndoChange]);
+
   const handlePointerDown = (e: React.PointerEvent) => {
     const ctx = ctxRef.current;
     if (disabled || !ctx || isPalmTouch(e)) return;
@@ -85,6 +106,9 @@ export const AnswerPad = forwardRef<AnswerPadHandle, AnswerPadProps>(function An
     e.preventDefault();
     canvasRef.current?.setPointerCapture(e.pointerId);
     drawingRef.current = true;
+
+    // Remember the state before this stroke so it can be undone.
+    pushUndoSnapshot();
 
     const point = getPoint(e);
     lastPointRef.current = point;
@@ -123,13 +147,40 @@ export const AnswerPad = forwardRef<AnswerPadHandle, AnswerPadProps>(function An
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
     if (!canvas || !ctx) return;
+    // Keep the pre-clear state so Clear can be undone too.
+    if (hasContentRef.current) pushUndoSnapshot();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     hasContentRef.current = false;
     setEmpty(true);
-  }, []);
+  }, [pushUndoSnapshot]);
+
+  const undo = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    const stack = undoStackRef.current;
+    if (!canvas || !ctx || stack.length === 0) return;
+
+    const snapshot = stack.pop()!;
+    onCanUndoChange?.(stack.length > 0);
+
+    const rect = canvas.getBoundingClientRect();
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+    };
+    img.src = snapshot;
+
+    // The restored snapshot may be blank (undoing the first stroke); treat any
+    // remaining strokes as content so isEmpty()/placeholder stay in sync.
+    const restoringToEmpty = stack.length === 0;
+    hasContentRef.current = !restoringToEmpty;
+    setEmpty(restoringToEmpty);
+  }, [onCanUndoChange]);
 
   useImperativeHandle(ref, () => ({
     clear,
+    undo,
     isEmpty: () => !hasContentRef.current,
     // Composite the strokes onto a white background so the vision model sees
     // dark ink on white rather than ink on transparency.
@@ -146,7 +197,7 @@ export const AnswerPad = forwardRef<AnswerPadHandle, AnswerPadProps>(function An
       octx.drawImage(canvas, 0, 0);
       return out.toDataURL('image/png');
     },
-  }), [clear]);
+  }), [clear, undo]);
 
   return (
     <div
