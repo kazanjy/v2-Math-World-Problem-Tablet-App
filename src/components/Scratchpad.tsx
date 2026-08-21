@@ -36,6 +36,32 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   // Current logical height of the (growable) workspace, in CSS pixels.
   const workspaceHeightRef = useRef(0);
 
+  // Custom thick scrollbar state (native one is hidden; hard to grab on touch).
+  const trackRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+  const dragOffsetRef = useRef(0);
+  const grewThisDragRef = useRef(false);
+  const wasNearBottomRef = useRef(false);
+  const [thumb, setThumb] = useState({ top: 0, height: 56, visible: false });
+
+  const MIN_THUMB = 56;
+  const GROW_SCREENS = 2; // how much workspace to add when reaching the bottom
+  const MAX_WORKSPACE_SCREENS = 24; // safety cap on total workspace height
+
+  // Recompute the scroll handle's size/position from the container's scroll.
+  const updateThumb = useCallback(() => {
+    const container = containerRef.current;
+    const track = trackRef.current;
+    if (!container || !track) return;
+    const trackH = track.clientHeight;
+    const ratio = container.scrollHeight > 0 ? container.clientHeight / container.scrollHeight : 1;
+    const height = Math.min(trackH, Math.max(MIN_THUMB, Math.round(ratio * trackH)));
+    const scrollable = container.scrollHeight - container.clientHeight;
+    const range = trackH - height;
+    const top = scrollable > 0 ? Math.round((container.scrollTop / scrollable) * range) : 0;
+    setThumb({ top, height, visible: scrollable > 1 });
+  }, []);
+
   // Size the canvas to the container width and the growable workspace height at
   // device-pixel resolution, optionally preserving the existing drawing.
   const applyCanvasSize = useCallback((preserve: boolean) => {
@@ -91,22 +117,93 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
-    const nearBottom =
-      container.scrollTop + container.clientHeight >= container.scrollHeight - container.clientHeight * 0.75;
-    if (nearBottom) {
-      workspaceHeightRef.current =
-        Math.max(workspaceHeightRef.current, container.clientHeight * 2) + container.clientHeight;
-      applyCanvasSize(true);
+
+    const visible = container.clientHeight;
+    const nearBottom = container.scrollTop + visible >= container.scrollHeight - visible * 0.5;
+    const underCap = workspaceHeightRef.current < visible * MAX_WORKSPACE_SCREENS;
+
+    // Grow the workspace when the user reaches the bottom. Guard against runaway
+    // growth: at most once per drag gesture (dragging is the only scroll input
+    // on touch), and only on entering the bottom zone for other scroll sources.
+    if (nearBottom && underCap) {
+      const allow = draggingRef.current ? !grewThisDragRef.current : !wasNearBottomRef.current;
+      if (allow) {
+        workspaceHeightRef.current = Math.max(workspaceHeightRef.current, visible * 2) + visible * GROW_SCREENS;
+        applyCanvasSize(true);
+        if (draggingRef.current) grewThisDragRef.current = true;
+      }
     }
-  }, [applyCanvasSize]);
+    wasNearBottomRef.current = nearBottom;
+
+    updateThumb();
+  }, [applyCanvasSize, updateThumb]);
+
+  // Set scrollTop so the handle's top edge lands at trackY (in track pixels).
+  const scrollToThumbTop = useCallback((thumbTop: number) => {
+    const container = containerRef.current;
+    const track = trackRef.current;
+    if (!container || !track) return;
+    const trackH = track.clientHeight;
+    const ratio = container.scrollHeight > 0 ? container.clientHeight / container.scrollHeight : 1;
+    const height = Math.min(trackH, Math.max(MIN_THUMB, ratio * trackH));
+    const range = trackH - height;
+    const scrollable = container.scrollHeight - container.clientHeight;
+    const clamped = Math.max(0, Math.min(range, thumbTop));
+    container.scrollTop = range > 0 ? (clamped / range) * scrollable : 0;
+  }, []);
+
+  const handleTrackPointerDown = useCallback((e: React.PointerEvent) => {
+    const container = containerRef.current;
+    const track = trackRef.current;
+    if (!container || !track || container.scrollHeight <= container.clientHeight) return;
+
+    e.preventDefault();
+    track.setPointerCapture(e.pointerId);
+    draggingRef.current = true;
+    grewThisDragRef.current = false;
+
+    const trackH = track.clientHeight;
+    const pointerY = e.clientY - track.getBoundingClientRect().top;
+    const ratio = container.clientHeight / container.scrollHeight;
+    const height = Math.min(trackH, Math.max(MIN_THUMB, ratio * trackH));
+    const range = trackH - height;
+    const scrollable = container.scrollHeight - container.clientHeight;
+    const currentTop = scrollable > 0 ? (container.scrollTop / scrollable) * range : 0;
+
+    // Grab within the handle keeps the offset; tapping the track jumps first.
+    if (pointerY >= currentTop && pointerY <= currentTop + height) {
+      dragOffsetRef.current = pointerY - currentTop;
+    } else {
+      dragOffsetRef.current = height / 2;
+      scrollToThumbTop(pointerY - height / 2);
+    }
+  }, [scrollToThumbTop]);
+
+  const handleTrackPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!draggingRef.current) return;
+    const track = trackRef.current;
+    if (!track) return;
+    e.preventDefault();
+    const pointerY = e.clientY - track.getBoundingClientRect().top;
+    scrollToThumbTop(pointerY - dragOffsetRef.current);
+  }, [scrollToThumbTop]);
+
+  const handleTrackPointerUp = useCallback((e: React.PointerEvent) => {
+    draggingRef.current = false;
+    trackRef.current?.releasePointerCapture?.(e.pointerId);
+  }, []);
 
   // Initialize and keep the canvas sized to the container.
   useEffect(() => {
     applyCanvasSize(false);
-    const onResize = () => applyCanvasSize(true);
+    updateThumb();
+    const onResize = () => {
+      applyCanvasSize(true);
+      updateThumb();
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [applyCanvasSize]);
+  }, [applyCanvasSize, updateThumb]);
 
   const getPointerPosition = useCallback((e: React.PointerEvent | PointerEvent): { x: number; y: number } => {
     const canvas = canvasRef.current;
@@ -289,9 +386,10 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
       if (containerRef.current) containerRef.current.scrollTop = 0;
       undoStackRef.current = [];
       setCanUndo(false);
+      updateThumb();
       onClear?.();
     },
-  }), [onClear, applyCanvasSize]);
+  }), [onClear, applyCanvasSize, updateThumb]);
 
   // Handle pointer events at the document level for smooth drawing
   useEffect(() => {
@@ -418,38 +516,62 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
         </div>
       </div>
 
-      {/* Scrollable, growable canvas workspace */}
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="scratch-scroll relative flex-1 bg-white border-2 border-gray-200 rounded-b-xl overflow-y-auto overflow-x-hidden"
-      >
-        <canvas
-          ref={canvasRef}
-          onPointerDown={startDrawing}
-          onPointerMove={handleCanvasPointerMove}
-          onPointerUp={stopDrawing}
-          onPointerLeave={handleCanvasPointerLeave}
-          onContextMenu={(e) => e.preventDefault()}
-          className={`block ${disabled ? 'cursor-not-allowed' : tool === 'eraser' ? 'cursor-none' : 'cursor-crosshair'}`}
-          style={{
-            touchAction: 'none',
-            background: 'repeating-linear-gradient(0deg, transparent, transparent 19px, #e5e7eb 19px, #e5e7eb 20px), repeating-linear-gradient(90deg, transparent, transparent 19px, #e5e7eb 19px, #e5e7eb 20px)',
-          }}
-        />
-
-        {/* Eraser preview ring - shows where the eraser will act, even on hover */}
-        {tool === 'eraser' && eraserCursor && !disabled && (
-          <div
-            className="pointer-events-none absolute rounded-full border-2 border-pink-400 bg-pink-300/20"
+      {/* Scrollable, growable canvas workspace + thick custom scroll handle */}
+      <div className="flex-1 flex min-h-0 bg-white border-2 border-gray-200 rounded-b-xl overflow-hidden">
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="scratch-scroll relative flex-1 overflow-y-auto overflow-x-hidden"
+        >
+          <canvas
+            ref={canvasRef}
+            onPointerDown={startDrawing}
+            onPointerMove={handleCanvasPointerMove}
+            onPointerUp={stopDrawing}
+            onPointerLeave={handleCanvasPointerLeave}
+            onContextMenu={(e) => e.preventDefault()}
+            className={`block ${disabled ? 'cursor-not-allowed' : tool === 'eraser' ? 'cursor-none' : 'cursor-crosshair'}`}
             style={{
-              width: ERASER_WIDTH,
-              height: ERASER_WIDTH,
-              left: eraserCursor.x - ERASER_WIDTH / 2,
-              top: eraserCursor.y - ERASER_WIDTH / 2,
+              touchAction: 'none',
+              background: 'repeating-linear-gradient(0deg, transparent, transparent 19px, #e5e7eb 19px, #e5e7eb 20px), repeating-linear-gradient(90deg, transparent, transparent 19px, #e5e7eb 19px, #e5e7eb 20px)',
             }}
           />
-        )}
+
+          {/* Eraser preview ring - shows where the eraser will act, even on hover */}
+          {tool === 'eraser' && eraserCursor && !disabled && (
+            <div
+              className="pointer-events-none absolute rounded-full border-2 border-pink-400 bg-pink-300/20"
+              style={{
+                width: ERASER_WIDTH,
+                height: ERASER_WIDTH,
+                left: eraserCursor.x - ERASER_WIDTH / 2,
+                top: eraserCursor.y - ERASER_WIDTH / 2,
+              }}
+            />
+          )}
+        </div>
+
+        {/* Thick, grabbable scroll handle */}
+        <div
+          ref={trackRef}
+          onPointerDown={handleTrackPointerDown}
+          onPointerMove={handleTrackPointerMove}
+          onPointerUp={handleTrackPointerUp}
+          onPointerCancel={handleTrackPointerUp}
+          className="relative w-12 shrink-0 bg-gray-100 border-l border-gray-200 select-none"
+          style={{ touchAction: 'none' }}
+        >
+          {thumb.visible && (
+            <div
+              className="absolute left-1.5 right-1.5 rounded-full bg-gray-400 hover:bg-gray-500 active:bg-gray-600 flex flex-col items-center justify-center gap-1"
+              style={{ top: thumb.top, height: thumb.height }}
+            >
+              <span className="w-5 h-0.5 rounded-full bg-white/70" />
+              <span className="w-5 h-0.5 rounded-full bg-white/70" />
+              <span className="w-5 h-0.5 rounded-full bg-white/70" />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
