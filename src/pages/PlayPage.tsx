@@ -207,7 +207,7 @@ export function PlayPage() {
   const sessionAtEnd = reachedQuestionCount || isTimedAndExpired;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-500 to-purple-600 flex flex-col">
+    <div className="h-screen bg-gradient-to-b from-blue-500 to-purple-600 flex flex-col">
       {/* Header */}
       <div className="bg-white/10 backdrop-blur-sm p-3 flex justify-between items-center">
         <div className="text-white">
@@ -232,7 +232,7 @@ export function PlayPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-4 flex flex-col gap-4 overflow-hidden">
+      <div className="flex-1 p-4 flex flex-col gap-4 overflow-y-auto">
         {/* Question */}
         <div className="bg-white rounded-2xl p-4 shadow-lg">
           {isGenerating ? (
