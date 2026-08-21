@@ -6,7 +6,7 @@ import { Scratchpad } from '../components/Scratchpad';
 import type { ScratchpadHandle } from '../components/Scratchpad';
 import { AnswerPad } from '../components/AnswerPad';
 import type { AnswerPadHandle } from '../components/AnswerPad';
-import { recognizeHandwrittenAnswer } from '../lib/openai';
+import { recognizeHandwrittenAnswer, formatMathText } from '../lib/openai';
 import { getKeypadConfig } from '../types';
 
 type InputMode = 'write' | 'keypad';
@@ -243,7 +243,7 @@ export function PlayPage() {
             </div>
           ) : currentQuestion ? (
             <p className="text-xl text-gray-800 leading-relaxed">
-              {currentQuestion.questionText}
+              {formatMathText(currentQuestion.questionText)}
             </p>
           ) : (
             <p className="text-gray-500 text-center">Loading...</p>
@@ -303,7 +303,7 @@ export function PlayPage() {
                 )}
               </div>
               <h4 className="font-semibold text-gray-700 mb-1">How to solve it:</h4>
-              <p className="text-gray-600 text-base">{feedback.explanation}</p>
+              <p className="text-gray-600 text-base">{formatMathText(feedback.explanation)}</p>
             </div>
 
             {canContinue ? (

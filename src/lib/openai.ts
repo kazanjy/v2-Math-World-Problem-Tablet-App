@@ -13,6 +13,41 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true, // For MVP; in production, use a backend
 });
 
+// Convert the LaTeX math notation the model sometimes emits into plain,
+// readable text (e.g. "\(\tfrac{3}{4}\)" -> "3/4"), so questions, answers, and
+// explanations render correctly instead of showing raw markup.
+export function formatMathText(input: string): string {
+  if (!input) return input;
+  let s = input;
+
+  // Fractions: \frac{a}{b}, \tfrac{a}{b}, \dfrac{a}{b} -> a/b
+  s = s.replace(/\\(?:t|d)?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '$1/$2');
+
+  // Common math operators / symbols
+  s = s
+    .replace(/\\times/g, '×')
+    .replace(/\\div/g, '÷')
+    .replace(/\\cdot/g, '·')
+    .replace(/\\pm/g, '±')
+    .replace(/\\leq/g, '≤')
+    .replace(/\\geq/g, '≥')
+    .replace(/\\neq/g, '≠')
+    .replace(/\\left/g, '')
+    .replace(/\\right/g, '')
+    .replace(/\\%/g, '%')
+    .replace(/\\\$/g, '$');
+
+  // Strip math delimiters: \( \) \[ \] and $ ... $
+  s = s.replace(/\\[()[\]]/g, '');
+  s = s.replace(/\$/g, '');
+
+  // Collapse spacing macros (\, \; \: \!) and extra whitespace
+  s = s.replace(/\\[,;:!]/g, ' ');
+  s = s.replace(/[ \t]{2,}/g, ' ').trim();
+
+  return s;
+}
+
 interface GenerateQuestionParams {
   theme: Theme;
   customTheme?: string;
@@ -193,7 +228,7 @@ Respond in JSON format exactly like this:
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful math teacher creating engaging word problems for students. Always respond with valid JSON. CRITICAL: Before responding, verify that your "answer" field contains the EXACT same value that your "explanation" concludes with. Double-check your math.',
+          content: 'You are a helpful math teacher creating engaging word problems for students. Always respond with valid JSON. Write all text in plain language with NO LaTeX or markdown formatting — express fractions as "3/4" (or mixed numbers like "1 1/2"), never as \\(\\tfrac{3}{4}\\) or \\frac{3}{4}. CRITICAL: Before responding, verify that your "answer" field contains the EXACT same value that your "explanation" concludes with. Double-check your math.',
         },
         {
           role: 'user',
@@ -226,6 +261,11 @@ Respond in JSON format exactly like this:
     if (!parsed.subTopic) {
       parsed.subTopic = 'general';
     }
+
+    // Convert any LaTeX the model emitted into plain text so it renders cleanly.
+    parsed.question = formatMathText(parsed.question);
+    parsed.explanation = formatMathText(parsed.explanation);
+    parsed.answer = formatMathText(parsed.answer);
 
     return parsed;
   } catch (error) {

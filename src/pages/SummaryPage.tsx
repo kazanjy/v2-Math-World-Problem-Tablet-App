@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useSessionStore } from '../stores/sessionStore';
+import { formatMathText } from '../lib/openai';
 import { THEME_LABELS } from '../types';
 
 export function SummaryPage() {
@@ -121,20 +122,20 @@ export function SummaryPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-gray-800 text-sm mb-2">{q.questionText}</p>
+                    <p className="text-gray-800 text-sm mb-2">{formatMathText(q.questionText)}</p>
                     <div className="flex flex-wrap gap-2 text-sm">
                       <span className="text-gray-600">
                         Your answer: <strong className={q.isCorrect ? 'text-green-600' : 'text-red-600'}>{q.userAnswer || '(none)'}</strong>
                       </span>
                       {!q.isCorrect && (
                         <span className="text-gray-600">
-                          Correct: <strong className="text-green-600">{q.correctAnswer}</strong>
+                          Correct: <strong className="text-green-600">{formatMathText(q.correctAnswer)}</strong>
                         </span>
                       )}
                     </div>
                     {!q.isCorrect && (
                       <div className="mt-2 text-sm text-gray-500 bg-white rounded p-2">
-                        {q.explanation}
+                        {formatMathText(q.explanation)}
                       </div>
                     )}
                   </div>
