@@ -33,56 +33,80 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   const undoStackRef = useRef<string[]>([]);
   const [canUndo, setCanUndo] = useState(false);
 
-  // Initialize canvas
-  useEffect(() => {
+  // Current logical height of the (growable) workspace, in CSS pixels.
+  const workspaceHeightRef = useRef(0);
+
+  // Size the canvas to the container width and the growable workspace height at
+  // device-pixel resolution, optionally preserving the existing drawing.
+  const applyCanvasSize = useCallback((preserve: boolean) => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    // Set canvas size to match container
-    const resizeCanvas = () => {
-      const rect = container.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      const newWidth = Math.round(rect.width * dpr);
-      const newHeight = Math.round(rect.height * dpr);
+    const dpr = window.devicePixelRatio || 1;
+    const width = container.clientWidth;
+    const visible = container.clientHeight;
+    if (width === 0 || visible === 0) return;
 
-      // Bail out if the size hasn't actually changed. Touch devices fire
-      // window "resize" events while scrolling (the address bar shows/hides),
-      // and reassigning canvas.width/height would wipe the drawing every time.
-      if (canvas.width === newWidth && canvas.height === newHeight) {
-        return;
+    // Start with at least two screens of height so there's room to scroll into.
+    const height = Math.max(visible * 2, workspaceHeightRef.current);
+    workspaceHeightRef.current = height;
+
+    const newWidth = Math.round(width * dpr);
+    const newHeight = Math.round(height * dpr);
+
+    // No-op if nothing changed (touch scrolling fires spurious resize events,
+    // and reassigning canvas.width/height would wipe the drawing every time).
+    if (canvas.width === newWidth && canvas.height === newHeight && contextRef.current) return;
+
+    // Preserve the existing drawing across a genuine resize / grow.
+    const snapshot = preserve && canvas.width > 0 && canvas.height > 0 ? canvas.toDataURL() : null;
+
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.scale(dpr, dpr);
+      ctx.strokeStyle = '#1e3a8a'; // Dark blue
+      ctx.lineWidth = PEN_WIDTH;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      contextRef.current = ctx;
+
+      if (snapshot) {
+        const img = new Image();
+        // Redraw at the snapshot's natural (unscaled) size so growth adds blank
+        // space below without stretching the existing work.
+        img.onload = () => ctx.drawImage(img, 0, 0, img.width / dpr, img.height / dpr);
+        img.src = snapshot;
       }
-
-      // Preserve the existing drawing across a genuine resize.
-      const snapshot = canvas.width > 0 && canvas.height > 0 ? canvas.toDataURL() : null;
-
-      canvas.width = newWidth;
-      canvas.height = newHeight;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.scale(dpr, dpr);
-        ctx.strokeStyle = '#1e3a8a'; // Dark blue
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        contextRef.current = ctx;
-
-        if (snapshot) {
-          const img = new Image();
-          img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
-          img.src = snapshot;
-        }
-      }
-    };
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    return () => window.removeEventListener('resize', resizeCanvas);
+    }
   }, []);
+
+  // Grow the workspace by one screen when the user scrolls near the bottom, so
+  // it behaves like infinite paper. Existing work is preserved.
+  const handleScroll = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const nearBottom =
+      container.scrollTop + container.clientHeight >= container.scrollHeight - container.clientHeight * 0.75;
+    if (nearBottom) {
+      workspaceHeightRef.current =
+        Math.max(workspaceHeightRef.current, container.clientHeight * 2) + container.clientHeight;
+      applyCanvasSize(true);
+    }
+  }, [applyCanvasSize]);
+
+  // Initialize and keep the canvas sized to the container.
+  useEffect(() => {
+    applyCanvasSize(false);
+    const onResize = () => applyCanvasSize(true);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [applyCanvasSize]);
 
   const getPointerPosition = useCallback((e: React.PointerEvent | PointerEvent): { x: number; y: number } => {
     const canvas = canvasRef.current;
@@ -238,12 +262,12 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     const snapshot = stack.pop()!;
     setCanUndo(stack.length > 0);
 
-    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
     const img = new Image();
     img.onload = () => {
       context.globalCompositeOperation = 'source-over';
       context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(img, 0, 0, rect.width, rect.height);
+      context.drawImage(img, 0, 0, img.width / dpr, img.height / dpr);
     };
     img.src = snapshot;
   }, []);
@@ -253,17 +277,21 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   // history, so a new question never lets you undo back into the previous one.
   useImperativeHandle(ref, () => ({
     clear: () => {
+      // Reset the workspace back to its starting height and scroll position.
+      workspaceHeightRef.current = 0;
+      applyCanvasSize(false);
       const canvas = canvasRef.current;
       const context = contextRef.current;
       if (canvas && context) {
         context.globalCompositeOperation = 'source-over';
         context.clearRect(0, 0, canvas.width, canvas.height);
       }
+      if (containerRef.current) containerRef.current.scrollTop = 0;
       undoStackRef.current = [];
       setCanUndo(false);
       onClear?.();
     },
-  }), [onClear]);
+  }), [onClear, applyCanvasSize]);
 
   // Handle pointer events at the document level for smooth drawing
   useEffect(() => {
@@ -390,11 +418,11 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
         </div>
       </div>
 
-      {/* Canvas */}
+      {/* Scrollable, growable canvas workspace */}
       <div
         ref={containerRef}
-        className="relative flex-1 bg-white border-2 border-gray-200 rounded-b-xl overflow-hidden"
-        style={{ touchAction: 'none' }}
+        onScroll={handleScroll}
+        className="scratch-scroll relative flex-1 bg-white border-2 border-gray-200 rounded-b-xl overflow-y-auto overflow-x-hidden"
       >
         <canvas
           ref={canvasRef}
@@ -403,7 +431,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
           onPointerUp={stopDrawing}
           onPointerLeave={handleCanvasPointerLeave}
           onContextMenu={(e) => e.preventDefault()}
-          className={`w-full h-full ${disabled ? 'cursor-not-allowed' : tool === 'eraser' ? 'cursor-none' : 'cursor-crosshair'}`}
+          className={`block ${disabled ? 'cursor-not-allowed' : tool === 'eraser' ? 'cursor-none' : 'cursor-crosshair'}`}
           style={{
             touchAction: 'none',
             background: 'repeating-linear-gradient(0deg, transparent, transparent 19px, #e5e7eb 19px, #e5e7eb 20px), repeating-linear-gradient(90deg, transparent, transparent 19px, #e5e7eb 19px, #e5e7eb 20px)',
