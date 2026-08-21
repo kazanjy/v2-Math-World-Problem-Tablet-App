@@ -29,6 +29,9 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   const [stylusOnly, setStylusOnly] = useState(false);
   // Where the eraser ring preview is drawn (null = hidden).
   const [eraserCursor, setEraserCursor] = useState<{ x: number; y: number } | null>(null);
+  // Undo history: canvas snapshots captured before each stroke (newest last).
+  const undoStackRef = useRef<string[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
 
   // Initialize canvas
   useEffect(() => {
@@ -122,11 +125,26 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     return tool === 'eraser' || isEraserButton(e);
   }, [tool, isEraserButton]);
 
+  // Snapshot the canvas so the action that follows can be undone. Called before
+  // each stroke (and before Clear); keeps a bounded history of PNG snapshots.
+  const UNDO_LIMIT = 30;
+  const pushUndoSnapshot = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const stack = undoStackRef.current;
+    stack.push(canvas.toDataURL());
+    if (stack.length > UNDO_LIMIT) stack.shift();
+    setCanUndo(true);
+  }, []);
+
   const startDrawing = useCallback((e: React.PointerEvent) => {
     const context = contextRef.current;
     if (disabled || !context || isPalmTouch(e)) return;
 
     e.preventDefault();
+
+    // Remember the state before this stroke so it can be undone.
+    pushUndoSnapshot();
 
     const erasing = shouldErase(e);
     setIsDrawing(true);
@@ -147,7 +165,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     context.beginPath();
     context.arc(point.x, point.y, erasing ? ERASER_WIDTH / 2 : 1.5, 0, Math.PI * 2);
     context.fill();
-  }, [disabled, getPointerPosition, shouldErase, isPalmTouch]);
+  }, [disabled, getPointerPosition, shouldErase, isPalmTouch, pushUndoSnapshot]);
 
   const draw = useCallback((e: React.PointerEvent) => {
     const context = contextRef.current;
@@ -202,14 +220,50 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     const context = contextRef.current;
     if (!canvas || !context) return;
 
+    // Keep the pre-clear state so Clear can be undone too.
+    if (canvas.width > 0 && canvas.height > 0) {
+      pushUndoSnapshot();
+    }
     context.clearRect(0, 0, canvas.width, canvas.height);
     onClear?.();
-  }, [onClear]);
+  }, [onClear, pushUndoSnapshot]);
+
+  // Undo the most recent stroke (or clear) by restoring the last snapshot.
+  const handleUndo = useCallback(() => {
+    const canvas = canvasRef.current;
+    const context = contextRef.current;
+    const stack = undoStackRef.current;
+    if (!canvas || !context || stack.length === 0) return;
+
+    const snapshot = stack.pop()!;
+    setCanUndo(stack.length > 0);
+
+    const rect = canvas.getBoundingClientRect();
+    const img = new Image();
+    img.onload = () => {
+      context.globalCompositeOperation = 'source-over';
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(img, 0, 0, rect.width, rect.height);
+    };
+    img.src = snapshot;
+  }, []);
 
   // Expose clear function via ref
+  // Imperative clear (used between questions) wipes the canvas AND the undo
+  // history, so a new question never lets you undo back into the previous one.
   useImperativeHandle(ref, () => ({
-    clear: handleClear,
-  }), [handleClear]);
+    clear: () => {
+      const canvas = canvasRef.current;
+      const context = contextRef.current;
+      if (canvas && context) {
+        context.globalCompositeOperation = 'source-over';
+        context.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      undoStackRef.current = [];
+      setCanUndo(false);
+      onClear?.();
+    },
+  }), [onClear]);
 
   // Handle pointer events at the document level for smooth drawing
   useEffect(() => {
@@ -314,13 +368,26 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
             </svg>
           </button>
         </div>
-        <button
-          onClick={handleClear}
-          disabled={disabled}
-          className="px-3 py-1 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm rounded-lg border border-gray-200 transition-colors"
-        >
-          Clear
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleUndo}
+            disabled={disabled || !canUndo}
+            className="flex items-center gap-1 px-3 py-1 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm rounded-lg border border-gray-200 transition-colors"
+            title="Undo last stroke"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+            </svg>
+            Undo
+          </button>
+          <button
+            onClick={handleClear}
+            disabled={disabled}
+            className="px-3 py-1 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm rounded-lg border border-gray-200 transition-colors"
+          >
+            Clear
+          </button>
+        </div>
       </div>
 
       {/* Canvas */}
