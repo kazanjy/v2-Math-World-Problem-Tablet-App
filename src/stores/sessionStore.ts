@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SessionConfig, Session, Question, GeneratedQuestion, Topic } from '../types';
+import type { SessionConfig, Session, Question, GeneratedQuestion } from '../types';
 import { generateQuestion, checkAnswer } from '../lib/openai';
 import { createSession, saveQuestion, updateQuestion, updateSession } from '../lib/supabase';
 import {
@@ -160,6 +160,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         customTheme: config.customTheme,
         gradeLevel: config.gradeLevel,
         topics: config.topics,
+        customTopics: config.customTopics,
         topicDifficulties: config.topicDifficulties,
         sessionType: config.sessionType,
         sessionValue: config.sessionType === 'count' ? config.questionCount! : config.timeMinutes!,
@@ -208,11 +209,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const previousGenre = lastQuestion?.genre;
     const previousSubTopic = lastQuestion?.subTopic;
 
-    // Randomly select a topic when multiple are enabled (for variety)
-    let selectedTopic: Topic | undefined;
-    if (config.topics && config.topics.length > 1 && !isRetry) {
-      const randomIndex = Math.floor(Math.random() * config.topics.length);
-      selectedTopic = config.topics[randomIndex];
+    // Randomly pick one topic from the combined preset + custom pool (for
+    // variety). A single-topic pool still passes the one topic explicitly.
+    const topicPool: string[] = [...(config.topics ?? []), ...(config.customTopics ?? [])];
+    let selectedTopic: string | undefined;
+    if (topicPool.length > 0 && !isRetry) {
+      selectedTopic = topicPool[Math.floor(Math.random() * topicPool.length)];
     }
 
     try {
@@ -221,6 +223,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         customTheme: config.customTheme,
         gradeLevel: config.gradeLevel,
         topics: config.topics,
+        customTopics: config.customTopics,
         topicDifficulties: config.topicDifficulties,
         previousQuestion,
         previousGenre,
@@ -264,6 +267,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         customTheme: config.customTheme,
         gradeLevel: config.gradeLevel,
         topics: config.topics,
+        customTopics: config.customTopics,
         topicDifficulties: config.topicDifficulties,
         isRetry: true,
         retryGenre: currentQuestion.genre,

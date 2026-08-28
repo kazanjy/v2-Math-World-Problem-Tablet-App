@@ -53,19 +53,25 @@ interface GenerateQuestionParams {
   customTheme?: string;
   gradeLevel?: GradeLevel; // Optional - used when not selecting topics
   topics?: Topic[]; // Optional - used when selecting specific topics
+  customTopics?: string[]; // Optional - free-text topics entered by the user
   topicDifficulties?: TopicDifficultySettings; // Difficulty settings per topic
   previousQuestion?: string;
   previousGenre?: string; // Genre of previous question for variety
   previousSubTopic?: string; // Sub-topic of previous question for variety
   recentSubTopics?: string[]; // Last N sub-topics to avoid repeating
-  selectedTopic?: Topic; // Pre-selected topic (for random selection)
+  selectedTopic?: string; // Pre-selected topic (preset or custom, for random selection)
   isRetry?: boolean;
   retryGenre?: string;
   retrySubTopic?: string; // Sub-topic to match when generating a similar problem
 }
 
 export async function generateQuestion(params: GenerateQuestionParams): Promise<GeneratedQuestion> {
-  const { theme, customTheme, gradeLevel, topics, topicDifficulties, previousQuestion, previousGenre, previousSubTopic, recentSubTopics, selectedTopic, isRetry, retryGenre, retrySubTopic } = params;
+  const { theme, customTheme, gradeLevel, topics, customTopics, topicDifficulties, previousQuestion, previousGenre, previousSubTopic, recentSubTopics, selectedTopic, isRetry, retryGenre, retrySubTopic } = params;
+
+  // Combined pool of preset + custom topics.
+  const presetTopics = topics ?? [];
+  const freeTopics = customTopics ?? [];
+  const allTopics: string[] = [...presetTopics, ...freeTopics];
 
   const themeDescription = theme === 'custom' && customTheme
     ? customTheme
@@ -74,20 +80,22 @@ export async function generateQuestion(params: GenerateQuestionParams): Promise<
     : theme;
 
   // Determine if we're in topic mode or grade mode
-  const isTopicMode = topics && topics.length > 0;
+  const isTopicMode = allTopics.length > 0;
 
   let prompt: string;
 
   if (isTopicMode) {
     // Topic-based mode - use pre-selected topic if provided, otherwise list all
-    const topicToUse = selectedTopic || topics[0];
-    const topicList = selectedTopic ? selectedTopic : topics.join(', ');
+    const topicToUse = selectedTopic || allTopics[0];
+    const topicList = selectedTopic ? selectedTopic : allTopics.join(', ');
 
-    // Build difficulty constraints per topic
+    // Build difficulty constraints per preset topic (custom topics have none).
     let difficultyConstraints = '';
     if (topicDifficulties) {
-      const topicsToConstrain = selectedTopic ? [selectedTopic] : topics;
-      const constraints = topicsToConstrain.map(topic => {
+      const presetToConstrain = selectedTopic
+        ? presetTopics.filter(t => t === selectedTopic)
+        : presetTopics;
+      const constraints = presetToConstrain.map(topic => {
         const difficulties = topicDifficulties[topic];
         if (difficulties && difficulties.length > 0 && difficulties.length < 4) {
           const diffLabels = difficulties.map(d => DIFFICULTY_FULL_LABELS[d]).join(', ');
@@ -181,8 +189,8 @@ Sub-topic examples by genre (with difficulty hints E=Easy, M=Medium, H=Hard, SH=
 
   if (isTopicMode) {
     prompt += `Requirements:
-- Focus on one of these topics: ${topics!.join(', ')}
-- The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")
+- Focus on one of these topics: ${allTopics.join(', ')}
+- The answer MUST be a single value (a whole number, decimal, or a fraction written as one value like "3/4" or "0.75") — never a list, pair, or multiple values. Even for a custom topic, design the problem so it has exactly ONE such answer.
 - Make the word problem engaging and fun with the ${themeDescription} theme
 - Gradually increase difficulty over time - start with easier problems and progress to harder ones
 - Use varied sub-topics within the genre to ensure variety

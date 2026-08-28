@@ -139,6 +139,7 @@ export interface SavedSettings {
   selectionMode: SelectionMode;
   gradeLevel: GradeLevel;
   topics: Topic[];
+  customTopics?: string[];
   topicDifficulties?: TopicDifficultySettings;
   sessionType: SessionType;
   questionCount: number;

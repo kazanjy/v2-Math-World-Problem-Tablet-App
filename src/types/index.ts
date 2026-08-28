@@ -101,6 +101,7 @@ export interface SessionConfig {
   customTheme?: string;
   gradeLevel?: GradeLevel; // Optional - used when not selecting topics
   topics?: Topic[]; // Optional - used when selecting specific topics (mutually exclusive with gradeLevel)
+  customTopics?: string[]; // Optional - free-text topics entered by the user (topics mode)
   topicDifficulties?: TopicDifficultySettings; // Difficulty settings per topic
   sessionType: SessionType;
   questionCount?: number;
@@ -143,6 +144,7 @@ export interface Session {
   customTheme?: string;
   gradeLevel?: GradeLevel;
   topics?: Topic[];
+  customTopics?: string[]; // Free-text topics entered by the user (topics mode)
   topicDifficulties?: TopicDifficultySettings; // Per-topic difficulty settings (topics mode)
   sessionType: SessionType;
   sessionValue: number; // question count or minutes
@@ -161,6 +163,7 @@ export function sessionToConfig(session: Session): SessionConfig {
     customTheme: session.customTheme,
     gradeLevel: session.gradeLevel,
     topics: session.topics,
+    customTopics: session.customTopics,
     topicDifficulties: session.topicDifficulties,
     sessionType: session.sessionType,
     questionCount: session.sessionType === 'count' ? session.sessionValue : undefined,
@@ -184,9 +187,9 @@ export interface KeypadConfig {
   showFraction: boolean;
 }
 
-export function getKeypadConfig(gradeLevel?: GradeLevel, topics?: Topic[]): KeypadConfig {
-  // If topics are selected, show all keypad options
-  if (topics && topics.length > 0) {
+export function getKeypadConfig(gradeLevel?: GradeLevel, topics?: Topic[], customTopics?: string[]): KeypadConfig {
+  // If any topics (preset or custom) are selected, show all keypad options
+  if ((topics && topics.length > 0) || (customTopics && customTopics.length > 0)) {
     return {
       showDecimal: true,
       showNegative: true,

@@ -196,7 +196,7 @@ export function PlayPage() {
     return null;
   }
 
-  const keypadConfig = getKeypadConfig(config.gradeLevel, config.topics);
+  const keypadConfig = getKeypadConfig(config.gradeLevel, config.topics, config.customTopics);
   const isTimedAndExpired = config.sessionType === 'timed' && timeRemaining !== null && timeRemaining <= 0;
   const canContinue = config.mode === 'chill' || !isTimedAndExpired;
   // The question just answered is already counted in `questions`, so once we've

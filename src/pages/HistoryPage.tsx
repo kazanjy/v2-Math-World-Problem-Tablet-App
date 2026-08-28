@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
+import { formatMathText } from '../lib/openai';
 import {
   THEME_LABELS,
   TOPIC_LABELS,
@@ -10,7 +11,7 @@ import {
   DIFFICULTIES,
   sessionToConfig,
 } from '../types';
-import type { Session, Difficulty } from '../types';
+import type { Session, Question, Difficulty } from '../types';
 
 const DIFFICULTY_CHIP_COLORS: Record<Difficulty, string> = {
   easy: 'bg-green-100 text-green-700',
@@ -108,7 +109,12 @@ interface SessionCardProps {
 }
 
 function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCardProps) {
-  const isTopicMode = !!session.topics && session.topics.length > 0;
+  const [expanded, setExpanded] = useState(false);
+  const [questions, setQuestions] = useState<Question[] | null>(null);
+
+  const presetTopics = session.topics ?? [];
+  const customTopics = session.customTopics ?? [];
+  const isTopicMode = presetTopics.length > 0 || customTopics.length > 0;
 
   const accuracy = session.totalAttempted > 0
     ? Math.round((session.totalCorrect / session.totalAttempted) * 100)
@@ -117,6 +123,13 @@ function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCar
   const sessionTypeLabel = session.sessionType === 'count'
     ? `${session.sessionValue} questions`
     : `${session.sessionValue} min${session.mode === 'race' ? ' • Race' : ' • Chill'}`;
+
+  const toggleReview = () => {
+    if (!expanded && questions === null) {
+      setQuestions(useSessionStore.getState().getSessionQuestions(session.id));
+    }
+    setExpanded((v) => !v);
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-lg p-4">
@@ -144,7 +157,7 @@ function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCar
         <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
           {sessionTypeLabel}
         </span>
-        {isTopicMode && session.topics!.map((topic) => {
+        {presetTopics.map((topic) => {
           const diffs = session.topicDifficulties?.[topic];
           const limited = diffs && diffs.length > 0 && diffs.length < DIFFICULTIES.length;
           return (
@@ -169,7 +182,68 @@ function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCar
             </span>
           );
         })}
+        {customTopics.map((t) => (
+          <span
+            key={t}
+            className="text-xs font-medium text-indigo-700 bg-indigo-100 px-2 py-1 rounded-full"
+          >
+            {t}
+          </span>
+        ))}
       </div>
+
+      {/* Question review (lazy-loaded) */}
+      {session.totalAttempted > 0 && (
+        <button
+          onClick={toggleReview}
+          className="w-full flex items-center justify-center gap-1 mb-2 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors"
+        >
+          {expanded ? 'Hide questions' : `Review ${session.totalAttempted} question${session.totalAttempted === 1 ? '' : 's'}`}
+          <span className={`transition-transform ${expanded ? 'rotate-180' : ''}`}>▾</span>
+        </button>
+      )}
+
+      {expanded && (
+        <div className="space-y-2 mb-3 max-h-[360px] overflow-y-auto">
+          {questions && questions.length > 0 ? (
+            questions.map((q, index) => (
+              <div
+                key={q.id}
+                className={`rounded-xl p-3 border ${
+                  q.isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  <span className={`text-lg leading-none ${q.isCorrect ? 'text-green-500' : 'text-red-500'}`}>
+                    {q.isCorrect ? '✓' : '✗'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 mb-1">
+                      <span className="text-gray-400 mr-1">#{index + 1}</span>
+                      {formatMathText(q.questionText)}
+                    </p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                      <span className="text-gray-600">
+                        Answered:{' '}
+                        <strong className={q.isCorrect ? 'text-green-600' : 'text-red-600'}>
+                          {q.userAnswer || '(none)'}
+                        </strong>
+                      </span>
+                      {!q.isCorrect && (
+                        <span className="text-gray-600">
+                          Correct: <strong className="text-green-600">{formatMathText(q.correctAnswer)}</strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-2">No question details saved for this session.</p>
+          )}
+        </div>
+      )}
 
       <button
         onClick={onStartAgain}

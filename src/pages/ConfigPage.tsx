@@ -24,6 +24,8 @@ export function ConfigPage() {
   const [selectionMode, setSelectionMode] = useState<SelectionMode>('grade');
   const [gradeLevel, setGradeLevel] = useState<GradeLevel>('3');
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [customTopics, setCustomTopics] = useState<string[]>([]);
+  const [customTopicInput, setCustomTopicInput] = useState('');
   const [topicDifficulties, setTopicDifficulties] = useState<TopicDifficultySettings>(() => {
     // Default: all difficulties enabled for all topics
     const defaults: TopicDifficultySettings = {} as TopicDifficultySettings;
@@ -48,6 +50,7 @@ export function ConfigPage() {
       setSelectionMode(saved.selectionMode || 'grade');
       setGradeLevel(saved.gradeLevel);
       setTopics(saved.topics || []);
+      setCustomTopics(saved.customTopics || []);
       if (saved.topicDifficulties) {
         setTopicDifficulties(saved.topicDifficulties);
       }
@@ -67,6 +70,20 @@ export function ConfigPage() {
         ? prev.filter(t => t !== topic)
         : [...prev, topic]
     );
+  };
+
+  // Add the typed custom topic (trimmed, de-duplicated, case-insensitive).
+  const addCustomTopic = () => {
+    const value = customTopicInput.trim();
+    if (!value) return;
+    setCustomTopics(prev =>
+      prev.some(t => t.toLowerCase() === value.toLowerCase()) ? prev : [...prev, value]
+    );
+    setCustomTopicInput('');
+  };
+
+  const removeCustomTopic = (topic: string) => {
+    setCustomTopics(prev => prev.filter(t => t !== topic));
   };
 
   // Toggle a difficulty for a specific topic
@@ -95,6 +112,7 @@ export function ConfigPage() {
         selectionMode,
         gradeLevel,
         topics,
+        customTopics,
         topicDifficulties,
         sessionType,
         questionCount,
@@ -110,6 +128,7 @@ export function ConfigPage() {
         // Only include gradeLevel if in grade mode, only include topics if in topics mode
         gradeLevel: selectionMode === 'grade' ? gradeLevel : undefined,
         topics: selectionMode === 'topics' ? topics : undefined,
+        customTopics: selectionMode === 'topics' && customTopics.length > 0 ? customTopics : undefined,
         topicDifficulties: selectionMode === 'topics' ? topicDifficulties : undefined,
         sessionType,
         questionCount: sessionType === 'count'
@@ -288,8 +307,63 @@ export function ConfigPage() {
                     </div>
                   ))}
                 </div>
-                {topics.length === 0 && (
-                  <p className="mt-2 text-sm text-amber-600">Select at least one topic to continue</p>
+
+                {/* Custom (free-text) topics */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Add your own topic
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customTopicInput}
+                      onChange={(e) => setCustomTopicInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addCustomTopic();
+                        }
+                      }}
+                      placeholder="e.g., Lowest common denominators"
+                      className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={addCustomTopic}
+                      disabled={!customTopicInput.trim()}
+                      className="px-5 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Each problem must have a single numeric answer (e.g. a number or a fraction like 3/4).
+                  </p>
+
+                  {customTopics.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {customTopics.map((t) => (
+                        <span
+                          key={t}
+                          className="inline-flex items-center gap-1.5 bg-indigo-100 text-indigo-700 pl-3 pr-2 py-1.5 rounded-full text-sm font-medium"
+                        >
+                          {t}
+                          <button
+                            type="button"
+                            onClick={() => removeCustomTopic(t)}
+                            className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-indigo-200 text-indigo-500"
+                            aria-label={`Remove ${t}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {topics.length === 0 && customTopics.length === 0 && (
+                  <p className="mt-3 text-sm text-amber-600">Select or add at least one topic to continue</p>
                 )}
               </div>
             )}
@@ -440,7 +514,7 @@ export function ConfigPage() {
             disabled={
               isStarting ||
               (theme === 'custom' && !customTheme.trim()) ||
-              (selectionMode === 'topics' && topics.length === 0)
+              (selectionMode === 'topics' && topics.length === 0 && customTopics.length === 0)
             }
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 px-6 rounded-xl text-xl transition-all shadow-lg hover:shadow-xl"
           >
