@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
@@ -35,9 +35,19 @@ export function HistoryPage() {
   const { profile } = useAuthStore();
   const { getSessionHistory, setConfig, startSession, reset } = useSessionStore();
 
-  // Snapshot the history once on mount (it won't change while on this page).
-  const sessions = useMemo(() => getSessionHistory(), [getSessionHistory]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
   const [startingId, setStartingId] = useState<string | null>(null);
+
+  // Load history on mount (localStorage in demo mode, Supabase otherwise).
+  useEffect(() => {
+    let active = true;
+    getSessionHistory()
+      .then((s) => { if (active) setSessions(s); })
+      .catch((err) => console.error('Error loading history:', err))
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [getSessionHistory]);
 
   const handleStartAgain = async (session: Session) => {
     if (!profile || startingId) return;
@@ -71,7 +81,12 @@ export function HistoryPage() {
           </button>
         </div>
 
-        {sessions.length === 0 ? (
+        {loading ? (
+          <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3" />
+            <p className="text-gray-500">Loading your sessions…</p>
+          </div>
+        ) : sessions.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
             <span className="text-5xl">📚</span>
             <h2 className="text-xl font-bold text-gray-800 mt-3 mb-1">No past sessions yet</h2>
@@ -111,6 +126,7 @@ interface SessionCardProps {
 function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [questions, setQuestions] = useState<Question[] | null>(null);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
 
   const presetTopics = session.topics ?? [];
   const customTopics = session.customTopics ?? [];
@@ -124,11 +140,21 @@ function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCar
     ? `${session.sessionValue} questions`
     : `${session.sessionValue} min${session.mode === 'race' ? ' • Race' : ' • Chill'}`;
 
-  const toggleReview = () => {
-    if (!expanded && questions === null) {
-      setQuestions(useSessionStore.getState().getSessionQuestions(session.id));
+  const toggleReview = async () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && questions === null && !loadingQuestions) {
+      setLoadingQuestions(true);
+      try {
+        const qs = await useSessionStore.getState().getSessionQuestions(session.id);
+        setQuestions(qs);
+      } catch (err) {
+        console.error('Error loading questions:', err);
+        setQuestions([]);
+      } finally {
+        setLoadingQuestions(false);
+      }
     }
-    setExpanded((v) => !v);
   };
 
   return (
@@ -205,7 +231,12 @@ function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCar
 
       {expanded && (
         <div className="space-y-2 mb-3 max-h-[360px] overflow-y-auto">
-          {questions && questions.length > 0 ? (
+          {loadingQuestions ? (
+            <div className="flex items-center justify-center py-4 text-gray-400">
+              <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400 mr-2" />
+              Loading…
+            </div>
+          ) : questions && questions.length > 0 ? (
             questions.map((q, index) => (
               <div
                 key={q.id}

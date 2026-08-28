@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import type { SessionConfig, Session, Question, GeneratedQuestion } from '../types';
 import { generateQuestion, checkAnswer } from '../lib/openai';
-import { createSession, saveQuestion, updateQuestion, updateSession } from '../lib/supabase';
+import {
+  createSession,
+  saveQuestion,
+  updateQuestion,
+  updateSession,
+  getUserSessions,
+  getSessionQuestions as getSupabaseSessionQuestions,
+} from '../lib/supabase';
 import {
   saveLocalSession,
   updateLocalSession,
@@ -109,9 +116,9 @@ interface SessionState {
   tick: () => void; // For timer
   reset: () => void;
 
-  // History actions (for demo mode)
-  getSessionHistory: () => Session[];
-  getSessionQuestions: (sessionId: string) => Question[];
+  // History actions (local storage in demo mode, Supabase otherwise)
+  getSessionHistory: () => Promise<Session[]>;
+  getSessionQuestions: (sessionId: string) => Promise<Question[]>;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -144,6 +151,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         theme: config.theme,
         customTheme: config.customTheme,
         gradeLevel: config.gradeLevel,
+        topics: config.topics,
+        customTopics: config.customTopics,
+        topicDifficulties: config.topicDifficulties,
         sessionType: config.sessionType,
         sessionValue: config.sessionType === 'count' ? config.questionCount! : config.timeMinutes!,
         mode: config.mode,
@@ -466,20 +476,22 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     });
   },
 
-  // History helpers for demo mode
-  getSessionHistory: () => {
+  // History helpers: localStorage in demo mode, Supabase when configured.
+  getSessionHistory: async () => {
     if (shouldUseLocalStorage()) {
       return getLocalSessions().sort((a, b) =>
         new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
       );
     }
-    return [];
+    const userId = useAuthStore.getState().profile?.id;
+    if (!userId) return [];
+    return getUserSessions(userId);
   },
 
-  getSessionQuestions: (sessionId: string) => {
+  getSessionQuestions: async (sessionId: string) => {
     if (shouldUseLocalStorage()) {
       return getLocalSessionQuestions(sessionId);
     }
-    return [];
+    return getSupabaseSessionQuestions(sessionId);
   },
 }));

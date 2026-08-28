@@ -18,7 +18,10 @@ CREATE TABLE IF NOT EXISTS sessions (
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   theme TEXT NOT NULL,
   custom_theme TEXT,
-  grade_level TEXT NOT NULL,
+  grade_level TEXT, -- NULL when the session is topic-based instead of grade-based
+  topics TEXT[], -- preset topics selected (topics mode)
+  custom_topics TEXT[], -- free-text topics entered by the user (topics mode)
+  topic_difficulties JSONB, -- per-topic difficulty settings (topics mode)
   session_type TEXT NOT NULL CHECK (session_type IN ('count', 'timed')),
   session_value INTEGER NOT NULL,
   mode TEXT NOT NULL DEFAULT 'chill' CHECK (mode IN ('chill', 'race')),
@@ -37,6 +40,8 @@ CREATE TABLE IF NOT EXISTS questions (
   correct_answer TEXT NOT NULL,
   explanation TEXT NOT NULL,
   genre TEXT NOT NULL,
+  sub_topic TEXT, -- specific sub-topic within the genre
+  difficulty TEXT, -- 'easy' | 'medium' | 'hard' | 'super-hard'
   user_answer TEXT,
   is_correct BOOLEAN,
   time_spent_seconds INTEGER,
@@ -100,3 +105,15 @@ CREATE POLICY "Users can update questions for own sessions" ON questions
       AND sessions.user_id = auth.uid()
     )
   );
+
+-- ---------------------------------------------------------------------------
+-- Migration for databases created before topic/custom-topic support.
+-- Safe to run repeatedly on an existing database (idempotent).
+-- ---------------------------------------------------------------------------
+ALTER TABLE sessions ALTER COLUMN grade_level DROP NOT NULL;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS topics TEXT[];
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS custom_topics TEXT[];
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS topic_difficulties JSONB;
+
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS sub_topic TEXT;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS difficulty TEXT;

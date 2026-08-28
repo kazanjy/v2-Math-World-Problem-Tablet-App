@@ -77,6 +77,27 @@ export async function getOrCreateProfile(userId: string, email: string): Promise
 }
 
 // Session helpers
+// Map a raw sessions row into a Session.
+function mapSessionRow(data: Record<string, unknown>): Session {
+  return {
+    id: data.id as string,
+    userId: data.user_id as string,
+    theme: data.theme as Session['theme'],
+    customTheme: (data.custom_theme as string) || undefined,
+    gradeLevel: (data.grade_level as Session['gradeLevel']) || undefined,
+    topics: (data.topics as Session['topics']) || undefined,
+    customTopics: (data.custom_topics as string[]) || undefined,
+    topicDifficulties: (data.topic_difficulties as Session['topicDifficulties']) || undefined,
+    sessionType: data.session_type as Session['sessionType'],
+    sessionValue: data.session_value as number,
+    mode: data.mode as Session['mode'],
+    startedAt: new Date(data.started_at as string),
+    endedAt: data.ended_at ? new Date(data.ended_at as string) : undefined,
+    totalCorrect: (data.total_correct as number) ?? 0,
+    totalAttempted: (data.total_attempted as number) ?? 0,
+  };
+}
+
 export async function createSession(session: Omit<Session, 'id' | 'startedAt' | 'totalCorrect' | 'totalAttempted'>): Promise<Session | null> {
   const { data, error } = await supabase
     .from('sessions')
@@ -85,6 +106,9 @@ export async function createSession(session: Omit<Session, 'id' | 'startedAt' | 
       theme: session.theme,
       custom_theme: session.customTheme,
       grade_level: session.gradeLevel,
+      topics: session.topics,
+      custom_topics: session.customTopics,
+      topic_difficulties: session.topicDifficulties,
       session_type: session.sessionType,
       session_value: session.sessionValue,
       mode: session.mode,
@@ -97,20 +121,23 @@ export async function createSession(session: Omit<Session, 'id' | 'startedAt' | 
     return null;
   }
 
-  return {
-    id: data.id,
-    userId: data.user_id,
-    theme: data.theme,
-    customTheme: data.custom_theme,
-    gradeLevel: data.grade_level,
-    sessionType: data.session_type,
-    sessionValue: data.session_value,
-    mode: data.mode,
-    startedAt: new Date(data.started_at),
-    endedAt: data.ended_at ? new Date(data.ended_at) : undefined,
-    totalCorrect: data.total_correct,
-    totalAttempted: data.total_attempted,
-  };
+  return mapSessionRow(data);
+}
+
+// Fetch a user's sessions, newest first (for the history screen).
+export async function getUserSessions(userId: string): Promise<Session[]> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('started_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching sessions:', error);
+    return [];
+  }
+
+  return data.map(mapSessionRow);
 }
 
 export async function updateSession(sessionId: string, updates: Partial<Pick<Session, 'endedAt' | 'totalCorrect' | 'totalAttempted'>>) {
