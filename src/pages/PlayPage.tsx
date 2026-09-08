@@ -6,7 +6,8 @@ import { Scratchpad } from '../components/Scratchpad';
 import type { ScratchpadHandle } from '../components/Scratchpad';
 import { AnswerPad } from '../components/AnswerPad';
 import type { AnswerPadHandle } from '../components/AnswerPad';
-import { recognizeHandwrittenAnswer, formatMathText } from '../lib/openai';
+import { recognizeHandwrittenAnswer, formatMathText, analyzeWork } from '../lib/openai';
+import type { WorkAnalysis } from '../lib/openai';
 import { getKeypadConfig } from '../types';
 
 type InputMode = 'write' | 'keypad';
@@ -45,6 +46,9 @@ export function PlayPage() {
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [recognizeError, setRecognizeError] = useState('');
   const [canUndoWrite, setCanUndoWrite] = useState(false);
+  // Tutor's read of the scratch work after a wrong answer.
+  const [analysis, setAnalysis] = useState<WorkAnalysis | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const scratchpadRef = useRef<ScratchpadHandle>(null);
   const answerPadRef = useRef<AnswerPadHandle>(null);
   const [feedback, setFeedback] = useState<FeedbackState>({
@@ -117,7 +121,32 @@ export function PlayPage() {
     });
 
     setIsSubmitting(false);
-  }, [submitAnswer, isSubmitting]);
+
+    // On a wrong answer, have the tutor read the scratch work and point out
+    // where it went off track. Best-effort: the worked solution is shown either
+    // way, so a failed or skipped analysis costs nothing.
+    if (!result.isCorrect && currentQuestion) {
+      const pad = scratchpadRef.current;
+      const image = pad && !pad.isEmpty() ? pad.toImageDataUrl() : null;
+      if (image) {
+        setIsAnalyzing(true);
+        try {
+          setAnalysis(await analyzeWork({
+            questionText: currentQuestion.questionText,
+            correctAnswer: result.correctAnswer,
+            userAnswer: value,
+            explanation: result.explanation,
+            genre: result.genre,
+            subTopic: result.subTopic,
+            gradeLevel: config?.gradeLevel,
+            scratchpadImage: image,
+          }));
+        } finally {
+          setIsAnalyzing(false);
+        }
+      }
+    }
+  }, [submitAnswer, isSubmitting, currentQuestion, config]);
 
   // Keypad submit
   const handleSubmit = useCallback(() => submitValue(answer), [submitValue, answer]);
@@ -146,6 +175,7 @@ export function PlayPage() {
 
   const handleNext = useCallback(async () => {
     setFeedback({ show: false, isCorrect: false, userAnswer: '', correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '', timeSpent: 0 });
+    setAnalysis(null);
     setAnswer('');
     setRecognizeError('');
 
@@ -172,6 +202,7 @@ export function PlayPage() {
 
   const handleTrySimilar = useCallback(async () => {
     setFeedback({ show: false, isCorrect: false, userAnswer: '', correctAnswer: '', explanation: '', genre: '', subTopic: '', difficulty: '', timeSpent: 0 });
+    setAnalysis(null);
     setAnswer('');
     setRecognizeError('');
 
@@ -305,6 +336,41 @@ export function PlayPage() {
               <h4 className="font-semibold text-gray-700 mb-1">How to solve it:</h4>
               <p className="text-gray-600 text-base">{formatMathText(feedback.explanation)}</p>
             </div>
+
+            {/* Tutor's read of the student's own scratch work */}
+            {!feedback.isCorrect && (isAnalyzing || analysis) && (
+              <div className="bg-white rounded-lg p-3 mb-4 border-l-4 border-amber-400">
+                <h4 className="font-semibold text-gray-700 mb-2">
+                  &#128064; A look at your work
+                </h4>
+                {isAnalyzing ? (
+                  <p className="text-gray-500 text-base animate-pulse">
+                    Reading your scratch pad&hellip;
+                  </p>
+                ) : analysis ? (
+                  <div className="flex flex-col gap-2 text-base">
+                    {analysis.whatYouDidWell && (
+                      <p className="text-gray-600">
+                        <span className="font-semibold text-green-700">Nice work: </span>
+                        {analysis.whatYouDidWell}
+                      </p>
+                    )}
+                    {analysis.whereYouWentWrong && (
+                      <p className="text-gray-600">
+                        <span className="font-semibold text-red-700">Where it slipped: </span>
+                        {analysis.whereYouWentWrong}
+                      </p>
+                    )}
+                    {analysis.howToFixIt && (
+                      <p className="text-gray-600">
+                        <span className="font-semibold text-blue-700">Next time: </span>
+                        {analysis.howToFixIt}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            )}
 
             {canContinue ? (
               <div className="flex flex-col gap-2">

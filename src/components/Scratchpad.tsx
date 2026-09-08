@@ -2,6 +2,10 @@ import { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardR
 
 export interface ScratchpadHandle {
   clear: () => void;
+  // True when the student has not drawn anything yet.
+  isEmpty: () => boolean;
+  // Flattened PNG snapshot of the work, for the tutor to read back.
+  toImageDataUrl: () => string | null;
 }
 
 interface ScratchpadProps {
@@ -373,6 +377,24 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   // Imperative clear (used between questions) wipes the canvas AND the undo
   // history, so a new question never lets you undo back into the previous one.
   useImperativeHandle(ref, () => ({
+    // A stroke is only pushed onto the undo stack once drawing starts, so an
+    // empty stack means an untouched pad.
+    isEmpty: () => undoStackRef.current.length === 0,
+    toImageDataUrl: () => {
+      const canvas = canvasRef.current;
+      if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
+      // The canvas itself is transparent; flatten onto white so the strokes are
+      // legible to the vision model.
+      const out = document.createElement('canvas');
+      out.width = canvas.width;
+      out.height = canvas.height;
+      const octx = out.getContext('2d');
+      if (!octx) return null;
+      octx.fillStyle = '#ffffff';
+      octx.fillRect(0, 0, out.width, out.height);
+      octx.drawImage(canvas, 0, 0);
+      return out.toDataURL('image/png');
+    },
     clear: () => {
       // Reset the workspace back to its starting height and scroll position.
       workspaceHeightRef.current = 0;
