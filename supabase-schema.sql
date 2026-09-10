@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   topics TEXT[], -- preset topics selected (topics mode)
   custom_topics TEXT[], -- free-text topics entered by the user (topics mode)
   topic_difficulties JSONB, -- per-topic difficulty settings (topics mode)
+  question_formats TEXT[], -- presentation styles: 'word' and/or 'numerical'
   session_type TEXT NOT NULL CHECK (session_type IN ('count', 'timed')),
   session_value INTEGER NOT NULL,
   mode TEXT NOT NULL DEFAULT 'chill' CHECK (mode IN ('chill', 'race')),
@@ -114,6 +115,7 @@ ALTER TABLE sessions ALTER COLUMN grade_level DROP NOT NULL;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS topics TEXT[];
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS custom_topics TEXT[];
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS topic_difficulties JSONB;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS question_formats TEXT[];
 
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS sub_topic TEXT;
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS difficulty TEXT;

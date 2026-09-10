@@ -12,6 +12,7 @@ export interface GenerateQuestionParams {
   topics?: Topic[];
   customTopics?: string[];
   topicDifficulties?: TopicDifficultySettings;
+  format?: 'word' | 'numerical'; // Presentation style for this question
   previousQuestion?: string;
   previousGenre?: string;
   previousSubTopic?: string;

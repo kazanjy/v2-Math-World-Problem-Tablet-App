@@ -95,6 +95,21 @@ export type SessionType = 'count' | 'timed';
 // Session mode: chill (can finish question after time) or race (hard stop)
 export type SessionMode = 'chill' | 'race';
 
+// Question presentation: a word problem/story, or a bare numerical expression.
+export type QuestionFormat = 'word' | 'numerical';
+
+export const QUESTION_FORMATS: QuestionFormat[] = ['word', 'numerical'];
+
+export const QUESTION_FORMAT_LABELS: Record<QuestionFormat, string> = {
+  word: 'Word Problems',
+  numerical: 'Numerical Problems',
+};
+
+export const QUESTION_FORMAT_DESCRIPTIONS: Record<QuestionFormat, string> = {
+  word: 'Story-based problems with a theme',
+  numerical: 'Just the equation, e.g. 936 ÷ 24 = ?',
+};
+
 // Session configuration
 export interface SessionConfig {
   theme: Theme;
@@ -103,6 +118,7 @@ export interface SessionConfig {
   topics?: Topic[]; // Optional - used when selecting specific topics (mutually exclusive with gradeLevel)
   customTopics?: string[]; // Optional - free-text topics entered by the user (topics mode)
   topicDifficulties?: TopicDifficultySettings; // Difficulty settings per topic
+  questionFormats?: QuestionFormat[]; // Which presentation styles to draw from (defaults to word)
   sessionType: SessionType;
   questionCount?: number;
   timeMinutes?: number;
@@ -146,6 +162,7 @@ export interface Session {
   topics?: Topic[];
   customTopics?: string[]; // Free-text topics entered by the user (topics mode)
   topicDifficulties?: TopicDifficultySettings; // Per-topic difficulty settings (topics mode)
+  questionFormats?: QuestionFormat[]; // Which presentation styles were used
   sessionType: SessionType;
   sessionValue: number; // question count or minutes
   mode: SessionMode;
@@ -165,6 +182,7 @@ export function sessionToConfig(session: Session): SessionConfig {
     topics: session.topics,
     customTopics: session.customTopics,
     topicDifficulties: session.topicDifficulties,
+    questionFormats: session.questionFormats,
     sessionType: session.sessionType,
     questionCount: session.sessionType === 'count' ? session.sessionValue : undefined,
     timeMinutes: session.sessionType === 'timed' ? session.sessionValue : undefined,

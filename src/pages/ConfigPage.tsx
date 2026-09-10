@@ -4,8 +4,8 @@ import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { getSavedSettings, saveSettings } from '../lib/localStorage';
 import type { SelectionMode } from '../lib/localStorage';
-import type { Theme, GradeLevel, SessionType, SessionMode, Topic, Difficulty, TopicDifficultySettings } from '../types';
-import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS, DIFFICULTIES, DIFFICULTY_LABELS, DIFFICULTY_FULL_LABELS } from '../types';
+import type { Theme, GradeLevel, SessionType, SessionMode, Topic, Difficulty, TopicDifficultySettings, QuestionFormat } from '../types';
+import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS, DIFFICULTIES, DIFFICULTY_LABELS, DIFFICULTY_FULL_LABELS, QUESTION_FORMATS, QUESTION_FORMAT_LABELS, QUESTION_FORMAT_DESCRIPTIONS } from '../types';
 
 const PRESET_QUESTION_COUNTS = [5, 10, 15, 20];
 const PRESET_TIME_OPTIONS = [5, 10, 15];
@@ -34,6 +34,7 @@ export function ConfigPage() {
     });
     return defaults;
   });
+  const [questionFormats, setQuestionFormats] = useState<QuestionFormat[]>(['word']);
   const [sessionType, setSessionType] = useState<SessionType>('count');
   const [questionCount, setQuestionCount] = useState(10);
   const [customQuestionCount, setCustomQuestionCount] = useState('');
@@ -51,6 +52,9 @@ export function ConfigPage() {
       setGradeLevel(saved.gradeLevel);
       setTopics(saved.topics || []);
       setCustomTopics(saved.customTopics || []);
+      if (saved.questionFormats && saved.questionFormats.length > 0) {
+        setQuestionFormats(saved.questionFormats);
+      }
       if (saved.topicDifficulties) {
         setTopicDifficulties(saved.topicDifficulties);
       }
@@ -86,6 +90,17 @@ export function ConfigPage() {
     setCustomTopics(prev => prev.filter(t => t !== topic));
   };
 
+  // Toggle a problem style, keeping at least one selected.
+  const toggleFormat = (fmt: QuestionFormat) => {
+    setQuestionFormats(prev => {
+      if (prev.includes(fmt)) {
+        const next = prev.filter(f => f !== fmt);
+        return next.length === 0 ? prev : next; // don't allow removing the last
+      }
+      return [...prev, fmt];
+    });
+  };
+
   // Toggle a difficulty for a specific topic
   const toggleTopicDifficulty = (topic: Topic, difficulty: Difficulty) => {
     setTopicDifficulties(prev => {
@@ -113,6 +128,7 @@ export function ConfigPage() {
         gradeLevel,
         topics,
         customTopics,
+        questionFormats,
         topicDifficulties,
         sessionType,
         questionCount,
@@ -130,6 +146,7 @@ export function ConfigPage() {
         topics: selectionMode === 'topics' ? topics : undefined,
         customTopics: selectionMode === 'topics' && customTopics.length > 0 ? customTopics : undefined,
         topicDifficulties: selectionMode === 'topics' ? topicDifficulties : undefined,
+        questionFormats,
         sessionType,
         questionCount: sessionType === 'count'
           ? (customQuestionCount ? parseInt(customQuestionCount) : questionCount)
@@ -366,6 +383,38 @@ export function ConfigPage() {
                   <p className="mt-3 text-sm text-amber-600">Select or add at least one topic to continue</p>
                 )}
               </div>
+            )}
+          </div>
+
+          {/* Problem Style */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">Problem Style</label>
+            <div className="grid grid-cols-2 gap-3">
+              {QUESTION_FORMATS.map((fmt) => {
+                const selected = questionFormats.includes(fmt);
+                return (
+                  <button
+                    key={fmt}
+                    onClick={() => toggleFormat(fmt)}
+                    className={`px-4 py-4 rounded-lg border-2 text-left transition-all ${
+                      selected
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-5 h-5 rounded flex items-center justify-center text-xs ${
+                        selected ? 'bg-blue-500 text-white' : 'bg-gray-200 text-transparent'
+                      }`}>✓</span>
+                      <span className="font-semibold">{QUESTION_FORMAT_LABELS[fmt]}</span>
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1">{QUESTION_FORMAT_DESCRIPTIONS[fmt]}</div>
+                  </button>
+                );
+              })}
+            </div>
+            {questionFormats.length === 2 && (
+              <p className="mt-2 text-xs text-gray-500">Both selected — questions will mix word problems and plain equations.</p>
             )}
           </div>
 

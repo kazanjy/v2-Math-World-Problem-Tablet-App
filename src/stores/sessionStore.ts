@@ -154,6 +154,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         topics: config.topics,
         customTopics: config.customTopics,
         topicDifficulties: config.topicDifficulties,
+        questionFormats: config.questionFormats,
         sessionType: config.sessionType,
         sessionValue: config.sessionType === 'count' ? config.questionCount! : config.timeMinutes!,
         mode: config.mode,
@@ -172,6 +173,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         topics: config.topics,
         customTopics: config.customTopics,
         topicDifficulties: config.topicDifficulties,
+        questionFormats: config.questionFormats,
         sessionType: config.sessionType,
         sessionValue: config.sessionType === 'count' ? config.questionCount! : config.timeMinutes!,
         mode: config.mode,
@@ -227,6 +229,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       selectedTopic = topicPool[Math.floor(Math.random() * topicPool.length)];
     }
 
+    // Randomly pick a presentation style from the enabled formats (default word).
+    const formatPool = config.questionFormats && config.questionFormats.length > 0
+      ? config.questionFormats
+      : ['word' as const];
+    const selectedFormat = formatPool[Math.floor(Math.random() * formatPool.length)];
+
     try {
       const generated = await generateQuestion({
         theme: config.theme,
@@ -235,6 +243,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         topics: config.topics,
         customTopics: config.customTopics,
         topicDifficulties: config.topicDifficulties,
+        format: selectedFormat,
         previousQuestion,
         previousGenre,
         previousSubTopic,
@@ -279,6 +288,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         topics: config.topics,
         customTopics: config.customTopics,
         topicDifficulties: config.topicDifficulties,
+        format: (config.questionFormats && config.questionFormats.length > 0
+          ? config.questionFormats[Math.floor(Math.random() * config.questionFormats.length)]
+          : 'word'),
         isRetry: true,
         retryGenre: currentQuestion.genre,
         retrySubTopic: currentQuestion.subTopic,

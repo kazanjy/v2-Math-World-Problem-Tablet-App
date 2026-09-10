@@ -1,4 +1,4 @@
-import type { Session, Question, UserProfile, Theme, GradeLevel, SessionType, SessionMode, Topic, TopicDifficultySettings } from '../types';
+import type { Session, Question, UserProfile, Theme, GradeLevel, SessionType, SessionMode, Topic, TopicDifficultySettings, QuestionFormat } from '../types';
 
 const STORAGE_KEYS = {
   PROFILE: 'mmg_profile',
@@ -141,6 +141,7 @@ export interface SavedSettings {
   topics: Topic[];
   customTopics?: string[];
   topicDifficulties?: TopicDifficultySettings;
+  questionFormats?: QuestionFormat[];
   sessionType: SessionType;
   questionCount: number;
   customQuestionCount: string;

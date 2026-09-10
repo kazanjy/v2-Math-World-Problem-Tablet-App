@@ -25,6 +25,7 @@ interface GenerateQuestionParams {
   topics?: string[];
   customTopics?: string[];
   topicDifficulties?: Record<string, Difficulty[]>;
+  format?: 'word' | 'numerical';
   previousQuestion?: string;
   previousGenre?: string;
   previousSubTopic?: string;
@@ -73,7 +74,7 @@ function formatMathText(input: string): string {
 
 function buildQuestionPrompt(params: GenerateQuestionParams): string {
   const {
-    theme, customTheme, gradeLevel, topics, customTopics, topicDifficulties,
+    theme, customTheme, gradeLevel, topics, customTopics, topicDifficulties, format,
     previousQuestion, previousGenre, previousSubTopic, recentSubTopics,
     selectedTopic, isRetry, retryGenre, retrySubTopic,
   } = params;
@@ -89,6 +90,18 @@ function buildQuestionPrompt(params: GenerateQuestionParams): string {
     : theme;
 
   const isTopicMode = allTopics.length > 0;
+
+  // Presentation style: word problem (default) vs a bare numerical expression.
+  const isNumerical = format === 'numerical';
+  const problemNoun = isNumerical
+    ? 'direct numerical math problem (just the equation/computation, no story or theme)'
+    : 'math word problem';
+  const themeBlock = isNumerical
+    ? ''
+    : `\nTheme: ${themeDescription}\n${theme === 'custom' ? `Use this theme for the story context: ${customTheme}` : `Incorporate ${themeDescription} elements into the story.`}\n`;
+  const formatRequirement = isNumerical
+    ? `\n- FORMAT: The "question" field must be ONLY the math expression or a short direct question (e.g. "47 × 8 = ?", "What is 3/4 + 2/3?", "Solve for p: 2p + 3 = 17"). Do NOT include any story, names, characters, scenario, or theme.`
+    : '';
 
   let prompt: string;
 
@@ -141,19 +154,13 @@ ${constraints.join('\n')}
       varietyConstraints += `- Pick a FRESH concept that is fundamentally different from recent questions.\n`;
     }
 
-    prompt = `Generate a math word problem focusing on ${selectedTopic ? `this topic: ${topicToUse}` : `one of these topics: ${topicList}`}.
-
-Theme: ${themeDescription}
-${theme === 'custom' ? `Use this theme for the story context: ${customTheme}` : `Incorporate ${themeDescription} elements into the story.`}
-${difficultyConstraints}${varietyConstraints}
+    prompt = `Generate a ${problemNoun} focusing on ${selectedTopic ? `this topic: ${topicToUse}` : `one of these topics: ${topicList}`}.
+${themeBlock}${difficultyConstraints}${varietyConstraints}
 `;
   } else {
     const gradeDescription = !gradeLevel ? 'Grade 3' : (gradeLevel === 'K' ? 'Kindergarten (ages 5-6)' : `Grade ${gradeLevel}`);
-    prompt = `Generate a math word problem for a ${gradeDescription} student.
-
-Theme: ${themeDescription}
-${theme === 'custom' ? `Use this theme for the story context: ${customTheme}` : `Incorporate ${themeDescription} elements into the story.`}
-
+    prompt = `Generate a ${problemNoun} for a ${gradeDescription} student.
+${themeBlock}
 `;
   }
 
@@ -187,8 +194,8 @@ Sub-topic examples by genre (with difficulty hints E=Easy, M=Medium, H=Hard, SH=
   if (isTopicMode) {
     prompt += `Requirements:
 - Focus on one of these topics: ${allTopics.join(', ')}
-- The answer MUST be a single value (a whole number, decimal, or a fraction written as one value like "3/4" or "0.75") — never a list, pair, or multiple values. Even for a custom topic, design the problem so it has exactly ONE such answer.
-- Make the word problem engaging and fun with the ${themeDescription} theme
+- The answer MUST be a single value (a whole number, decimal, or a fraction written as one value like "3/4" or "0.75") — never a list, pair, or multiple values. Even for a custom topic, design the problem so it has exactly ONE such answer.${formatRequirement}
+- ${isNumerical ? 'Keep it a clean computation' : `Make the word problem engaging and fun with the ${themeDescription} theme`}
 - Gradually increase difficulty over time - start with easier problems and progress to harder ones
 - Use varied sub-topics within the genre to ensure variety
 - IMPORTANT: Double-check your math! The "answer" field MUST match the final answer in your "explanation". Verify the calculation is correct before responding.
@@ -206,8 +213,8 @@ Respond in JSON format exactly like this:
     const gradeDescription = !gradeLevel ? 'Grade 3' : (gradeLevel === 'K' ? 'Kindergarten (ages 5-6)' : `Grade ${gradeLevel}`);
     prompt += `Requirements:
 - The problem should be appropriate for ${gradeDescription} students
-- The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")
-- Make the word problem engaging and fun with the ${themeDescription} theme
+- The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")${formatRequirement}
+- ${isNumerical ? 'Keep it a clean computation' : `Make the word problem engaging and fun with the ${themeDescription} theme`}
 - Use varied sub-topics to ensure variety
 - IMPORTANT: Double-check your math! The "answer" field MUST match the final answer in your "explanation". Verify the calculation is correct before responding.
 ${subTopicGuidance}

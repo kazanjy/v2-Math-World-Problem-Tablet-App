@@ -9,6 +9,7 @@ import {
   DIFFICULTY_LABELS,
   DIFFICULTY_FULL_LABELS,
   DIFFICULTIES,
+  QUESTION_FORMAT_LABELS,
   sessionToConfig,
 } from '../types';
 import type { Session, Question, Difficulty } from '../types';
@@ -183,6 +184,11 @@ function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCar
         <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
           {sessionTypeLabel}
         </span>
+        {session.questionFormats && session.questionFormats.length > 0 && (
+          <span className="text-xs font-medium text-teal-700 bg-teal-100 px-2 py-1 rounded-full">
+            {session.questionFormats.map((f) => QUESTION_FORMAT_LABELS[f]).join(' + ')}
+          </span>
+        )}
         {presetTopics.map((topic) => {
           const diffs = session.topicDifficulties?.[topic];
           const limited = diffs && diffs.length > 0 && diffs.length < DIFFICULTIES.length;
