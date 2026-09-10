@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
-import { formatMathText } from '../lib/openai';
+import { formatMathText, analyzeMistake } from '../lib/openai';
 import {
   THEME_LABELS,
   TOPIC_LABELS,
@@ -238,37 +238,7 @@ function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCar
             </div>
           ) : questions && questions.length > 0 ? (
             questions.map((q, index) => (
-              <div
-                key={q.id}
-                className={`rounded-xl p-3 border ${
-                  q.isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  <span className={`text-lg leading-none ${q.isCorrect ? 'text-green-500' : 'text-red-500'}`}>
-                    {q.isCorrect ? '✓' : '✗'}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-800 mb-1">
-                      <span className="text-gray-400 mr-1">#{index + 1}</span>
-                      {formatMathText(q.questionText)}
-                    </p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                      <span className="text-gray-600">
-                        Answered:{' '}
-                        <strong className={q.isCorrect ? 'text-green-600' : 'text-red-600'}>
-                          {q.userAnswer || '(none)'}
-                        </strong>
-                      </span>
-                      {!q.isCorrect && (
-                        <span className="text-gray-600">
-                          Correct: <strong className="text-green-600">{formatMathText(q.correctAnswer)}</strong>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <QuestionReviewItem key={q.id} q={q} index={index} />
             ))
           ) : (
             <p className="text-sm text-gray-400 text-center py-2">No question details saved for this session.</p>
@@ -283,6 +253,99 @@ function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCar
       >
         {isStarting ? 'Starting…' : '▶ Start Again'}
       </button>
+    </div>
+  );
+}
+
+function QuestionReviewItem({ q, index }: { q: Question; index: number }) {
+  const [showWork, setShowWork] = useState(false);
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  const handleAnalyze = async () => {
+    if (analyzing) return;
+    setShowWork(true);
+    if (analysis !== null) return;
+    setAnalyzing(true);
+    try {
+      const result = await analyzeMistake({
+        question: q.questionText,
+        userAnswer: q.userAnswer,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+      });
+      setAnalysis(result || "Sorry, couldn't analyze this one right now.");
+    } catch {
+      setAnalysis("Sorry, couldn't analyze this one right now.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  return (
+    <div
+      className={`rounded-xl p-3 border ${
+        q.isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <span className={`text-lg leading-none ${q.isCorrect ? 'text-green-500' : 'text-red-500'}`}>
+          {q.isCorrect ? '✓' : '✗'}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-gray-800 mb-1">
+            <span className="text-gray-400 mr-1">#{index + 1}</span>
+            {formatMathText(q.questionText)}
+          </p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            <span className="text-gray-600">
+              Answered:{' '}
+              <strong className={q.isCorrect ? 'text-green-600' : 'text-red-600'}>
+                {q.userAnswer || '(none)'}
+              </strong>
+            </span>
+            {!q.isCorrect && (
+              <span className="text-gray-600">
+                Correct: <strong className="text-green-600">{formatMathText(q.correctAnswer)}</strong>
+              </span>
+            )}
+          </div>
+
+          {/* Wrong-answer analysis */}
+          {!q.isCorrect && (
+            <div className="mt-2">
+              <button
+                onClick={handleAnalyze}
+                className="text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 px-2.5 py-1 rounded-full transition-colors"
+              >
+                🔍 Analyze what went wrong
+              </button>
+
+              {showWork && (
+                <div className="mt-2 space-y-2">
+                  {q.explanation && (
+                    <div className="text-xs text-gray-600 bg-white rounded-lg p-2">
+                      <span className="font-semibold text-gray-700">How to solve it: </span>
+                      {formatMathText(q.explanation)}
+                    </div>
+                  )}
+                  <div className="text-xs text-gray-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                    <span className="font-semibold text-amber-800">What went wrong: </span>
+                    {analyzing ? (
+                      <span className="inline-flex items-center gap-1 text-gray-500">
+                        <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400" />
+                        Analyzing…
+                      </span>
+                    ) : (
+                      analysis
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

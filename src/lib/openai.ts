@@ -52,6 +52,31 @@ export async function recognizeHandwrittenAnswer(imageDataUrl: string): Promise<
   }
 }
 
+// Ask the server for a kid-friendly analysis of a specific wrong answer.
+// Returns the analysis text, or "" if unavailable.
+export async function analyzeMistake(input: {
+  question: string;
+  userAnswer?: string;
+  correctAnswer: string;
+  explanation?: string;
+}): Promise<string> {
+  try {
+    const res = await fetch('/api/analyze-mistake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      throw new Error(`Analyze API returned ${res.status}`);
+    }
+    const data = (await res.json()) as { analysis?: string };
+    return data.analysis ?? '';
+  } catch (error) {
+    console.error('Error analyzing mistake:', error);
+    return '';
+  }
+}
+
 // Helper to normalize answers for comparison
 export function normalizeAnswer(answer: string): string {
   // Remove extra whitespace and lowercase
