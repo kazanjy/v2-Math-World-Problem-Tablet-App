@@ -37,7 +37,9 @@ export type Topic =
   | 'word-problems'
   | 'pre-algebra'
   | 'algebra'
-  | 'geometry';
+  | 'geometry'
+  | 'trigonometry'
+  | 'pre-calculus';
 
 export const TOPICS: Topic[] = [
   'addition',
@@ -51,6 +53,8 @@ export const TOPICS: Topic[] = [
   'pre-algebra',
   'algebra',
   'geometry',
+  'trigonometry',
+  'pre-calculus',
 ];
 
 export const TOPIC_LABELS: Record<Topic, string> = {
@@ -65,6 +69,8 @@ export const TOPIC_LABELS: Record<Topic, string> = {
   'pre-algebra': 'Pre-Algebra',
   'algebra': 'Algebra',
   'geometry': 'Geometry',
+  'trigonometry': 'Trigonometry',
+  'pre-calculus': 'Pre-Calculus',
 };
 
 // Difficulty levels returned by OpenAI

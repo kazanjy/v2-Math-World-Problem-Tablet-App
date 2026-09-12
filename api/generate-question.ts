@@ -189,12 +189,15 @@ Sub-topic examples by genre (with difficulty hints E=Easy, M=Medium, H=Hard, SH=
 - pre-algebra: "order-of-operations" (M), "variables-expressions" (M), "one-step-equations" (M), "inequalities" (H), "negative-numbers" (M), "absolute-value" (M), "ratios-proportions" (M)
 - algebra: "two-step-equations" (M), "multi-step-equations" (H), "systems-of-equations" (SH), "polynomials" (H), "factoring" (H), "quadratics" (SH)
 - geometry: "shape-identification" (E), "counting-sides-vertices" (E), "shape-properties" (E-M), "perimeter-squares-rectangles" (E), "perimeter-triangles" (M), "perimeter-irregular" (M), "area-rectangles" (E-M), "area-triangles" (M), "area-circles" (M), "area-composite-shapes" (H), "volume-cubes-boxes" (M), "volume-cylinders" (H), "angles-identifying" (E), "angles-measuring" (M), "angles-calculating" (M), "complementary-supplementary" (M), "pythagorean-theorem" (H), "coordinate-geometry" (H-SH)
+- trigonometry: "degree-radian-conversion" (E-M), "sohcahtoa-ratios" (M), "sine-cosine-tangent-values" (M), "solving-right-triangles" (M-H), "angle-of-elevation-depression" (H), "unit-circle-values" (M-H), "pythagorean-identity" (H), "law-of-sines" (H), "law-of-cosines" (H)
+- pre-calculus: "function-evaluation" (M), "composite-functions" (H), "inverse-functions" (H), "exponential-expressions" (H), "logarithms" (H), "arithmetic-geometric-sequences" (H), "polynomial-roots" (H), "rational-function-values" (H), "vector-magnitude" (M-H), "basic-limits" (H-SH)
 `;
 
   if (isTopicMode) {
     prompt += `Requirements:
 - Focus on one of these topics: ${allTopics.join(', ')}
 - The answer MUST be a single value (a whole number, decimal, or a fraction written as one value like "3/4" or "0.75") — never a list, pair, or multiple values. Even for a custom topic, design the problem so it has exactly ONE such answer.
+- If the exact answer is irrational (e.g. involves π or a square root, as often happens in trigonometry, pre-calculus, or geometry), give a decimal rounded to 2 decimal places (e.g. 0.87) so the answer is a single clean number.
 - The problem MUST be fully solvable from the information given, with a valid, well-defined answer. NEVER generate an impossible, contradictory, under-specified, or undefined problem (e.g. missing information, or division by zero).${formatRequirement}
 - ${isNumerical ? 'Keep it a clean computation' : `Make the word problem engaging and fun with the ${themeDescription} theme`}
 - Gradually increase difficulty over time - start with easier problems and progress to harder ones
@@ -215,6 +218,7 @@ Respond in JSON format exactly like this:
     prompt += `Requirements:
 - The problem should be appropriate for ${gradeDescription} students
 - The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")
+- If the exact answer is irrational (e.g. involves π or a square root), give a decimal rounded to 2 decimal places (e.g. 0.87) so the answer is a single clean number.
 - The problem MUST be fully solvable from the information given, with a valid, well-defined answer. NEVER generate an impossible, contradictory, under-specified, or undefined problem (e.g. missing information, or division by zero).${formatRequirement}
 - ${isNumerical ? 'Keep it a clean computation' : `Make the word problem engaging and fun with the ${themeDescription} theme`}
 - Use varied sub-topics to ensure variety
