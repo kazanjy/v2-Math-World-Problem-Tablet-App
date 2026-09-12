@@ -252,7 +252,7 @@ export function PlayPage() {
         </div>
 
         {/* Scratchpad - stays usable while reviewing feedback so the student can keep working */}
-        <div className="h-[520px]">
+        <div className="flex-1 min-h-[300px] flex flex-col">
           <Scratchpad ref={scratchpadRef} disabled={isGenerating} />
         </div>
 

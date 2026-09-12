@@ -193,7 +193,10 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
     trackRef.current?.releasePointerCapture?.(e.pointerId);
   }, []);
 
-  // Initialize and keep the canvas sized to the container.
+  // Initialize and keep the canvas sized to the container. The pad now flexes
+  // to fill available height, so it can change size from layout alone (e.g.
+  // when the feedback card appears) — observe the container, not just the
+  // window. applyCanvasSize(true) preserves the drawing across resizes.
   useEffect(() => {
     applyCanvasSize(false);
     updateThumb();
@@ -202,7 +205,17 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
       updateThumb();
     };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+
+    const container = containerRef.current;
+    const observer = typeof ResizeObserver !== 'undefined' && container
+      ? new ResizeObserver(onResize)
+      : null;
+    observer?.observe(container!);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      observer?.disconnect();
+    };
   }, [applyCanvasSize, updateThumb]);
 
   const getPointerPosition = useCallback((e: React.PointerEvent | PointerEvent): { x: number; y: number } => {
@@ -441,7 +454,7 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
   }, [isDrawing, disabled, getPointerPosition, tool, stylusOnly]);
 
   return (
-    <div className="relative flex flex-col h-full">
+    <div className="relative flex flex-col flex-1 min-h-0">
       {/* Toolbar */}
       <div className="flex justify-between items-center p-2 bg-gray-100 rounded-t-xl">
         <div className="flex items-center gap-1">
