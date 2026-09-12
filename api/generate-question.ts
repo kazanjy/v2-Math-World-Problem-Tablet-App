@@ -208,11 +208,11 @@ Sub-topic examples by genre (with difficulty hints E=Easy, M=Medium, H=Hard, SH=
 - Use varied sub-topics within the genre to ensure variety
 - IMPORTANT: Double-check your math! The "answer" field MUST match the final answer in your "explanation". Verify the calculation is correct before responding.
 ${subTopicGuidance}
-Respond in JSON format exactly like this:
+Respond in JSON format exactly like this. IMPORTANT: fill in the fields IN THIS ORDER — work the problem out completely in "explanation" FIRST, and only then set "answer" to the exact final value your explanation arrives at:
 {
   "question": "The word problem text",
-  "answer": "The numeric answer (number only, e.g., '42' or '3.5' or '3/4')",
-  "explanation": "Step-by-step solution explanation showing how to solve it",
+  "explanation": "Step-by-step solution showing how to solve it, ending with the final value",
+  "answer": "The final numeric answer from the explanation (number only, e.g., '42' or '3.5' or '3/4')",
   "genre": "The specific math concept being tested (e.g., 'addition', 'subtraction', 'multiplication', 'division', 'fractions', 'decimals', 'percentages', 'pre-algebra', 'algebra', 'geometry', 'word-problems')",
   "subTopic": "The specific sub-topic within the genre (e.g., 'double-digit-with-carrying', 'adding-different-denominators', 'percent-of-number')",
   "difficulty": "The difficulty level of this problem: 'easy', 'medium', 'hard', or 'super-hard'"
@@ -228,11 +228,11 @@ Respond in JSON format exactly like this:
 - Use varied sub-topics to ensure variety
 - IMPORTANT: Double-check your math! The "answer" field MUST match the final answer in your "explanation". Verify the calculation is correct before responding.
 ${subTopicGuidance}
-Respond in JSON format exactly like this:
+Respond in JSON format exactly like this. IMPORTANT: fill in the fields IN THIS ORDER — work the problem out completely in "explanation" FIRST, and only then set "answer" to the exact final value your explanation arrives at:
 {
   "question": "The word problem text",
-  "answer": "The numeric answer (number only, e.g., '42' or '3.5' or '3/4')",
-  "explanation": "Step-by-step solution explanation showing how to solve it",
+  "explanation": "Step-by-step solution showing how to solve it, ending with the final value",
+  "answer": "The final numeric answer from the explanation (number only, e.g., '42' or '3.5' or '3/4')",
   "genre": "The math concept being tested (e.g., 'addition', 'subtraction', 'multiplication', 'division', 'fractions', 'percentages', 'word-problems')",
   "subTopic": "The specific sub-topic within the genre (e.g., 'double-digit-with-carrying', 'adding-different-denominators', 'money-problems')",
   "difficulty": "The difficulty level of this problem: 'easy', 'medium', 'hard', or 'super-hard'"
@@ -241,6 +241,52 @@ Respond in JSON format exactly like this:
 
   return prompt;
 }
+
+// Normalize a numeric/fraction answer for comparison (mirrors the client).
+function normalizeAnswer(answer: string): string {
+  let normalized = answer.trim().toLowerCase();
+  const mixed = normalized.match(/^(-?\d+)\s+(\d+)\/(\d+)$/);
+  if (mixed) {
+    const whole = parseFloat(mixed[1]);
+    const num = parseFloat(mixed[2]);
+    const den = parseFloat(mixed[3]);
+    if (!isNaN(whole) && !isNaN(num) && !isNaN(den) && den !== 0) {
+      normalized = (whole + (whole < 0 ? -1 : 1) * (num / den)).toString();
+    }
+  } else if (normalized.includes('/')) {
+    const parts = normalized.split('/');
+    if (parts.length === 2) {
+      const num = parseFloat(parts[0].trim());
+      const den = parseFloat(parts[1].trim());
+      if (!isNaN(num) && !isNaN(den) && den !== 0) {
+        normalized = (num / den).toString();
+      }
+    }
+  }
+  const n = parseFloat(normalized);
+  return isNaN(n) ? normalized : (Math.round(n * 10000) / 10000).toString();
+}
+
+// Pull the final stated value out of a worked explanation: prefer the value
+// after the last "=" sign, otherwise the last number in the text.
+const VALUE = String.raw`-?\d+(?:\s+\d+\/\d+|\/\d+|\.\d+)?`;
+function extractFinalValue(explanation: string): string | null {
+  const eq = [...explanation.matchAll(new RegExp(String.raw`=\s*(${VALUE})`, 'g'))];
+  if (eq.length > 0) return eq[eq.length - 1][1];
+  const nums = [...explanation.matchAll(new RegExp(VALUE, 'g'))];
+  if (nums.length > 0) return nums[nums.length - 1][0];
+  return null;
+}
+
+// True when the answer field agrees with the explanation's concluding value
+// (or when we can't extract one to compare against).
+function answerMatchesExplanation(q: GeneratedQuestion): boolean {
+  const final = extractFinalValue(q.explanation);
+  if (!final) return true;
+  return normalizeAnswer(final) === normalizeAnswer(q.answer);
+}
+
+const MAX_ATTEMPTS = 3;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -252,10 +298,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const openai = new OpenAI({ apiKey });
 
-  try {
-    const params = (req.body ?? {}) as GenerateQuestionParams;
-    const userPrompt = buildQuestionPrompt(params);
-
+  const generateOnce = async (userPrompt: string): Promise<GeneratedQuestion> => {
     const response = await openai.chat.completions.create({
       model: MODEL,
       messages: [
@@ -287,9 +330,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     parsed.question = formatMathText(parsed.question);
     parsed.explanation = formatMathText(parsed.explanation);
-    parsed.answer = formatMathText(parsed.answer);
+    parsed.answer = formatMathText(String(parsed.answer));
 
-    return res.status(200).json(parsed);
+    return parsed;
+  };
+
+  try {
+    const params = (req.body ?? {}) as GenerateQuestionParams;
+    const userPrompt = buildQuestionPrompt(params);
+
+    // Generate, then verify the answer key agrees with the worked explanation.
+    // A mismatch means the model committed to a number that its own solution
+    // contradicts (a wrong answer key), so regenerate rather than ship it.
+    let last: GeneratedQuestion | null = null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const q = await generateOnce(userPrompt);
+      last = q;
+      if (answerMatchesExplanation(q)) {
+        return res.status(200).json(q);
+      }
+      console.warn(
+        `generate-question: answer/explanation mismatch (attempt ${attempt}/${MAX_ATTEMPTS}): answer="${q.answer}", explanation concludes "${extractFinalValue(q.explanation)}"`
+      );
+    }
+
+    // Persistent mismatch: the worked explanation is the derivation, so trust
+    // its concluding value over the bare answer field.
+    const final = extractFinalValue(last!.explanation);
+    if (final) {
+      last!.answer = formatMathText(final);
+    }
+    return res.status(200).json(last);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error('generate-question error:', error);
