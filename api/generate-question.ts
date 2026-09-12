@@ -185,12 +185,16 @@ Sub-topic examples by genre (with difficulty hints E=Easy, M=Medium, H=Hard, SH=
 - fractions: "identifying-fractions" (E), "equivalent-fractions" (E), "comparing-fractions" (M), "adding-same-denominator" (E), "adding-different-denominators" (M), "subtracting-fractions" (M), "multiplying-fractions" (H), "dividing-fractions" (H), "mixed-numbers" (M), "fraction-of-whole" (M)
 - decimals: "place-value" (E), "comparing-decimals" (E), "adding-decimals" (M), "subtracting-decimals" (M), "multiplying-decimals" (H), "dividing-decimals" (H), "decimal-fraction-conversion" (M)
 - percentages: "percent-of-number" (M), "fraction-decimal-percent-conversion" (M), "percent-increase-decrease" (H), "discounts-sales-tax" (M), "tips-gratuity" (M)
+- integers: "adding-integers" (E-M), "subtracting-integers" (M), "multiplying-integers" (M), "dividing-integers" (M), "absolute-value" (E-M), "order-of-operations-with-negatives" (H)
+- exponents-roots: "squares" (E), "cubes" (M), "square-roots" (E-M), "cube-roots" (M), "powers-of-ten" (E), "exponent-rules" (M-H), "negative-exponents" (H), "scientific-notation" (M-H)
+- statistics: "mean" (E-M), "median" (E), "mode" (E), "range" (E), "mean-from-frequency" (M), "weighted-average" (H), "simple-probability" (M), "probability-of-events" (M-H)
 - word-problems: "money-problems" (E-M), "time-distance-rate" (M-H), "measurement" (E-M), "comparison" (E-M), "multi-step" (H)
 - pre-algebra: "order-of-operations" (M), "variables-expressions" (M), "one-step-equations" (M), "inequalities" (H), "negative-numbers" (M), "absolute-value" (M), "ratios-proportions" (M)
 - algebra: "two-step-equations" (M), "multi-step-equations" (H), "systems-of-equations" (SH), "polynomials" (H), "factoring" (H), "quadratics" (SH)
 - geometry: "shape-identification" (E), "counting-sides-vertices" (E), "shape-properties" (E-M), "perimeter-squares-rectangles" (E), "perimeter-triangles" (M), "perimeter-irregular" (M), "area-rectangles" (E-M), "area-triangles" (M), "area-circles" (M), "area-composite-shapes" (H), "volume-cubes-boxes" (M), "volume-cylinders" (H), "angles-identifying" (E), "angles-measuring" (M), "angles-calculating" (M), "complementary-supplementary" (M), "pythagorean-theorem" (H), "coordinate-geometry" (H-SH)
 - trigonometry: "degree-radian-conversion" (E-M), "sohcahtoa-ratios" (M), "sine-cosine-tangent-values" (M), "solving-right-triangles" (M-H), "angle-of-elevation-depression" (H), "unit-circle-values" (M-H), "pythagorean-identity" (H), "law-of-sines" (H), "law-of-cosines" (H)
 - pre-calculus: "function-evaluation" (M), "composite-functions" (H), "inverse-functions" (H), "exponential-expressions" (H), "logarithms" (H), "arithmetic-geometric-sequences" (H), "polynomial-roots" (H), "rational-function-values" (H), "vector-magnitude" (M-H), "basic-limits" (H-SH)
+- calculus: "evaluate-derivative-at-point" (H), "power-rule-derivative-value" (H), "slope-of-tangent-at-point" (H), "average-rate-of-change" (M-H), "definite-integral-value" (H-SH), "limit-value" (H)
 `;
 
   if (isTopicMode) {

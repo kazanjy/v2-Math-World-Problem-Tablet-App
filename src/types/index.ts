@@ -35,11 +35,15 @@ export type Topic =
   | 'decimals'
   | 'percentages'
   | 'word-problems'
+  | 'integers'
+  | 'exponents-roots'
+  | 'statistics'
   | 'pre-algebra'
   | 'algebra'
   | 'geometry'
   | 'trigonometry'
-  | 'pre-calculus';
+  | 'pre-calculus'
+  | 'calculus';
 
 export const TOPICS: Topic[] = [
   'addition',
@@ -49,12 +53,16 @@ export const TOPICS: Topic[] = [
   'fractions',
   'decimals',
   'percentages',
+  'integers',
+  'exponents-roots',
+  'statistics',
   'word-problems',
   'pre-algebra',
   'algebra',
   'geometry',
   'trigonometry',
   'pre-calculus',
+  'calculus',
 ];
 
 export const TOPIC_LABELS: Record<Topic, string> = {
@@ -65,12 +73,16 @@ export const TOPIC_LABELS: Record<Topic, string> = {
   'fractions': 'Fractions',
   'decimals': 'Decimals',
   'percentages': 'Percentages',
+  'integers': 'Integers',
+  'exponents-roots': 'Exponents & Roots',
+  'statistics': 'Statistics & Probability',
   'word-problems': 'Word Problems',
   'pre-algebra': 'Pre-Algebra',
   'algebra': 'Algebra',
   'geometry': 'Geometry',
   'trigonometry': 'Trigonometry',
   'pre-calculus': 'Pre-Calculus',
+  'calculus': 'Calculus',
 };
 
 // Difficulty levels returned by OpenAI
