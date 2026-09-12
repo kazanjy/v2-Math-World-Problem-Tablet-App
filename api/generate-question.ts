@@ -46,7 +46,7 @@ interface GeneratedQuestion {
 }
 
 const SYSTEM_PROMPT =
-  'You are a helpful math teacher creating engaging word problems for students. Always respond with valid JSON. Write all text in plain language with NO LaTeX or markdown formatting — express fractions as "3/4" (or mixed numbers like "1 1/2"), never as \\(\\tfrac{3}{4}\\) or \\frac{3}{4}. CRITICAL: Before responding, verify that your "answer" field contains the EXACT same value that your "explanation" concludes with. Double-check your math.';
+  'You are a helpful math teacher creating engaging word problems for students. Always respond with valid JSON. Write all text in plain language with NO LaTeX or markdown formatting — express fractions as "3/4" (or mixed numbers like "1 1/2"), never as \\(\\tfrac{3}{4}\\) or \\frac{3}{4}. CRITICAL: Before responding, verify (1) that the problem is actually solvable and has a valid, well-defined single answer — never produce an unsolvable, contradictory, or under-specified problem — and (2) that your "answer" field contains the EXACT same value that your "explanation" concludes with. Double-check your math.';
 
 // Convert LaTeX the model may emit into plain text (e.g. "\\tfrac{3}{4}" -> "3/4").
 function formatMathText(input: string): string {
@@ -194,7 +194,8 @@ Sub-topic examples by genre (with difficulty hints E=Easy, M=Medium, H=Hard, SH=
   if (isTopicMode) {
     prompt += `Requirements:
 - Focus on one of these topics: ${allTopics.join(', ')}
-- The answer MUST be a single value (a whole number, decimal, or a fraction written as one value like "3/4" or "0.75") — never a list, pair, or multiple values. Even for a custom topic, design the problem so it has exactly ONE such answer.${formatRequirement}
+- The answer MUST be a single value (a whole number, decimal, or a fraction written as one value like "3/4" or "0.75") — never a list, pair, or multiple values. Even for a custom topic, design the problem so it has exactly ONE such answer.
+- The problem MUST be fully solvable from the information given, with a valid, well-defined answer. NEVER generate an impossible, contradictory, under-specified, or undefined problem (e.g. missing information, or division by zero).${formatRequirement}
 - ${isNumerical ? 'Keep it a clean computation' : `Make the word problem engaging and fun with the ${themeDescription} theme`}
 - Gradually increase difficulty over time - start with easier problems and progress to harder ones
 - Use varied sub-topics within the genre to ensure variety
@@ -213,7 +214,8 @@ Respond in JSON format exactly like this:
     const gradeDescription = !gradeLevel ? 'Grade 3' : (gradeLevel === 'K' ? 'Kindergarten (ages 5-6)' : `Grade ${gradeLevel}`);
     prompt += `Requirements:
 - The problem should be appropriate for ${gradeDescription} students
-- The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")${formatRequirement}
+- The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")
+- The problem MUST be fully solvable from the information given, with a valid, well-defined answer. NEVER generate an impossible, contradictory, under-specified, or undefined problem (e.g. missing information, or division by zero).${formatRequirement}
 - ${isNumerical ? 'Keep it a clean computation' : `Make the word problem engaging and fun with the ${themeDescription} theme`}
 - Use varied sub-topics to ensure variety
 - IMPORTANT: Double-check your math! The "answer" field MUST match the final answer in your "explanation". Verify the calculation is correct before responding.
