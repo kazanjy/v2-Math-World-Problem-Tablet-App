@@ -6,6 +6,7 @@ import { Scratchpad } from '../components/Scratchpad';
 import type { ScratchpadHandle } from '../components/Scratchpad';
 import { AnswerPad } from '../components/AnswerPad';
 import type { AnswerPadHandle } from '../components/AnswerPad';
+import { MistakeAnalysis } from '../components/MistakeAnalysis';
 import { recognizeHandwrittenAnswer, formatMathText } from '../lib/openai';
 import { getKeypadConfig } from '../types';
 
@@ -305,6 +306,16 @@ export function PlayPage() {
               <h4 className="font-semibold text-gray-700 mb-1">How to solve it:</h4>
               <p className="text-gray-600 text-base">{formatMathText(feedback.explanation)}</p>
             </div>
+
+            {!feedback.isCorrect && currentQuestion && (
+              <MistakeAnalysis
+                className="mb-4"
+                question={currentQuestion.questionText}
+                userAnswer={feedback.userAnswer}
+                correctAnswer={feedback.correctAnswer}
+                explanation={feedback.explanation}
+              />
+            )}
 
             {canContinue ? (
               <div className="flex flex-col gap-2">

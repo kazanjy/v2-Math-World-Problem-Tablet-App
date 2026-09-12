@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useSessionStore } from '../stores/sessionStore';
 import { formatMathText } from '../lib/openai';
+import { MistakeAnalysis } from '../components/MistakeAnalysis';
 import { THEME_LABELS } from '../types';
 
 export function SummaryPage() {
@@ -137,6 +138,15 @@ export function SummaryPage() {
                       <div className="mt-2 text-sm text-gray-500 bg-white rounded p-2">
                         {formatMathText(q.explanation)}
                       </div>
+                    )}
+                    {!q.isCorrect && (
+                      <MistakeAnalysis
+                        className="mt-2"
+                        question={q.questionText}
+                        userAnswer={q.userAnswer}
+                        correctAnswer={q.correctAnswer}
+                        explanation={q.explanation}
+                      />
                     )}
                   </div>
                 </div>

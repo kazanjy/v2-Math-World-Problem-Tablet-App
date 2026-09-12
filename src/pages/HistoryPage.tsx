@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
-import { formatMathText, analyzeMistake } from '../lib/openai';
+import { formatMathText } from '../lib/openai';
+import { MistakeAnalysis } from '../components/MistakeAnalysis';
 import {
   THEME_LABELS,
   TOPIC_LABELS,
@@ -264,30 +265,6 @@ function SessionCard({ session, isStarting, disabled, onStartAgain }: SessionCar
 }
 
 function QuestionReviewItem({ q, index }: { q: Question; index: number }) {
-  const [showWork, setShowWork] = useState(false);
-  const [analysis, setAnalysis] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-
-  const handleAnalyze = async () => {
-    if (analyzing) return;
-    setShowWork(true);
-    if (analysis !== null) return;
-    setAnalyzing(true);
-    try {
-      const result = await analyzeMistake({
-        question: q.questionText,
-        userAnswer: q.userAnswer,
-        correctAnswer: q.correctAnswer,
-        explanation: q.explanation,
-      });
-      setAnalysis(result || "Sorry, couldn't analyze this one right now.");
-    } catch {
-      setAnalysis("Sorry, couldn't analyze this one right now.");
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
   return (
     <div
       className={`rounded-xl p-3 border ${
@@ -317,38 +294,15 @@ function QuestionReviewItem({ q, index }: { q: Question; index: number }) {
             )}
           </div>
 
-          {/* Wrong-answer analysis */}
           {!q.isCorrect && (
-            <div className="mt-2">
-              <button
-                onClick={handleAnalyze}
-                className="text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 px-2.5 py-1 rounded-full transition-colors"
-              >
-                🔍 Analyze what went wrong
-              </button>
-
-              {showWork && (
-                <div className="mt-2 space-y-2">
-                  {q.explanation && (
-                    <div className="text-xs text-gray-600 bg-white rounded-lg p-2">
-                      <span className="font-semibold text-gray-700">How to solve it: </span>
-                      {formatMathText(q.explanation)}
-                    </div>
-                  )}
-                  <div className="text-xs text-gray-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                    <span className="font-semibold text-amber-800">What went wrong: </span>
-                    {analyzing ? (
-                      <span className="inline-flex items-center gap-1 text-gray-500">
-                        <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400" />
-                        Analyzing…
-                      </span>
-                    ) : (
-                      analysis
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            <MistakeAnalysis
+              className="mt-2"
+              question={q.questionText}
+              userAnswer={q.userAnswer}
+              correctAnswer={q.correctAnswer}
+              explanation={q.explanation}
+              showExplanation
+            />
           )}
         </div>
       </div>
