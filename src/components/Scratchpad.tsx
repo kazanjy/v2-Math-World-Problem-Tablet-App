@@ -529,8 +529,32 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
         </div>
       </div>
 
-      {/* Scrollable, growable canvas workspace + thick custom scroll handle */}
+      {/* Scrollable, growable canvas workspace + thick custom scroll handle.
+          The handle sits on the LEFT so a right-handed stylus user's resting
+          palm doesn't land on it. */}
       <div className="flex-1 flex min-h-0 bg-white border-2 border-gray-200 rounded-b-xl overflow-hidden">
+        {/* Thick, grabbable scroll handle */}
+        <div
+          ref={trackRef}
+          onPointerDown={handleTrackPointerDown}
+          onPointerMove={handleTrackPointerMove}
+          onPointerUp={handleTrackPointerUp}
+          onPointerCancel={handleTrackPointerUp}
+          className="relative w-12 shrink-0 bg-gray-100 border-r border-gray-200 select-none"
+          style={{ touchAction: 'none' }}
+        >
+          {thumb.visible && (
+            <div
+              className="absolute left-1.5 right-1.5 rounded-full bg-gray-400 hover:bg-gray-500 active:bg-gray-600 flex flex-col items-center justify-center gap-1"
+              style={{ top: thumb.top, height: thumb.height }}
+            >
+              <span className="w-5 h-0.5 rounded-full bg-white/70" />
+              <span className="w-5 h-0.5 rounded-full bg-white/70" />
+              <span className="w-5 h-0.5 rounded-full bg-white/70" />
+            </div>
+          )}
+        </div>
+
         <div
           ref={containerRef}
           onScroll={handleScroll}
@@ -561,28 +585,6 @@ export const Scratchpad = forwardRef<ScratchpadHandle, ScratchpadProps>(function
                 top: eraserCursor.y - ERASER_WIDTH / 2,
               }}
             />
-          )}
-        </div>
-
-        {/* Thick, grabbable scroll handle */}
-        <div
-          ref={trackRef}
-          onPointerDown={handleTrackPointerDown}
-          onPointerMove={handleTrackPointerMove}
-          onPointerUp={handleTrackPointerUp}
-          onPointerCancel={handleTrackPointerUp}
-          className="relative w-12 shrink-0 bg-gray-100 border-l border-gray-200 select-none"
-          style={{ touchAction: 'none' }}
-        >
-          {thumb.visible && (
-            <div
-              className="absolute left-1.5 right-1.5 rounded-full bg-gray-400 hover:bg-gray-500 active:bg-gray-600 flex flex-col items-center justify-center gap-1"
-              style={{ top: thumb.top, height: thumb.height }}
-            >
-              <span className="w-5 h-0.5 rounded-full bg-white/70" />
-              <span className="w-5 h-0.5 rounded-full bg-white/70" />
-              <span className="w-5 h-0.5 rounded-full bg-white/70" />
-            </div>
           )}
         </div>
       </div>
