@@ -7,6 +7,7 @@ import type { ScratchpadHandle } from '../components/Scratchpad';
 import { AnswerPad } from '../components/AnswerPad';
 import type { AnswerPadHandle } from '../components/AnswerPad';
 import { MistakeAnalysis } from '../components/MistakeAnalysis';
+import { useFullscreen } from '../hooks/useFullscreen';
 import { recognizeHandwrittenAnswer, formatMathText } from '../lib/openai';
 import { getKeypadConfig } from '../types';
 
@@ -26,6 +27,7 @@ interface FeedbackState {
 
 export function PlayPage() {
   const navigate = useNavigate();
+  const { isFullscreen, supported: fullscreenSupported, isStandalone, toggle: toggleFullscreen } = useFullscreen();
   const {
     config,
     session,
@@ -209,7 +211,7 @@ export function PlayPage() {
   const sessionAtEnd = reachedQuestionCount || isTimedAndExpired;
 
   return (
-    <div className="h-screen bg-gradient-to-b from-blue-500 to-purple-600 flex flex-col">
+    <div className="app-shell bg-gradient-to-b from-blue-500 to-purple-600 flex flex-col">
       {/* Header */}
       <div className="bg-white/10 backdrop-blur-sm p-3 flex justify-between items-center">
         <div className="text-white">
@@ -225,12 +227,26 @@ export function PlayPage() {
           </div>
         )}
 
-        <button
-          onClick={handleEndSession}
-          className="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-sm transition-colors"
-        >
-          End Session
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Fullscreen hides the browser chrome so the page stops shifting.
+              Not shown when running as an installed (standalone) app — there's
+              no chrome to hide. */}
+          {fullscreenSupported && !isStandalone && (
+            <button
+              onClick={toggleFullscreen}
+              className="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-sm transition-colors"
+              title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            >
+              {isFullscreen ? '✕ Exit Fullscreen' : '⛶ Fullscreen'}
+            </button>
+          )}
+          <button
+            onClick={handleEndSession}
+            className="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-sm transition-colors"
+          >
+            End Session
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
