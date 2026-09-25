@@ -2,13 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
-import { getSavedSettings, saveSettings } from '../lib/localStorage';
+import { getSavedSettings, saveSettings, PRESET_QUESTION_COUNTS, PRESET_TIME_OPTIONS } from '../lib/localStorage';
 import type { SelectionMode } from '../lib/localStorage';
 import type { Theme, GradeLevel, SessionType, SessionMode, Topic, Difficulty, TopicDifficultySettings, QuestionFormat } from '../types';
 import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS, DIFFICULTIES, DIFFICULTY_LABELS, DIFFICULTY_FULL_LABELS, QUESTION_FORMATS, QUESTION_FORMAT_LABELS, QUESTION_FORMAT_DESCRIPTIONS } from '../types';
-
-const PRESET_QUESTION_COUNTS = [5, 10, 15, 20];
-const PRESET_TIME_OPTIONS = [5, 10, 15];
 
 export function ConfigPage() {
   const navigate = useNavigate();

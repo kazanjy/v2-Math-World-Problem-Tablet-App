@@ -1,4 +1,4 @@
-import type { Session, Question, UserProfile, Theme, GradeLevel, SessionType, SessionMode, Topic, TopicDifficultySettings, QuestionFormat } from '../types';
+import type { Session, Question, UserProfile, Theme, GradeLevel, SessionType, SessionMode, Topic, TopicDifficultySettings, QuestionFormat, SessionConfig } from '../types';
 
 const STORAGE_KEYS = {
   PROFILE: 'mmg_profile',
@@ -158,4 +158,35 @@ export function getSavedSettings(): SavedSettings | null {
 
 export function saveSettings(settings: SavedSettings): void {
   localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+}
+
+// Preset choices shown on the config page (shared so derived settings match).
+export const PRESET_QUESTION_COUNTS = [5, 10, 15, 20];
+export const PRESET_TIME_OPTIONS = [5, 10, 15];
+
+// Derive the config page's saved form state from a session configuration, so
+// the "New Session" page reflects whatever session was last started — including
+// one relaunched from History — rather than the last manually-entered form.
+// Fields the config doesn't carry (e.g. gradeLevel in topics mode) fall back to
+// the existing saved values so the user doesn't lose them.
+export function configToSavedSettings(config: SessionConfig, existing?: SavedSettings | null): SavedSettings {
+  const isTopics = (config.topics?.length ?? 0) > 0 || (config.customTopics?.length ?? 0) > 0;
+  const count = config.questionCount;
+  const mins = config.timeMinutes;
+  return {
+    theme: config.theme,
+    customTheme: config.customTheme ?? existing?.customTheme ?? '',
+    selectionMode: isTopics ? 'topics' : 'grade',
+    gradeLevel: config.gradeLevel ?? existing?.gradeLevel ?? '3',
+    topics: isTopics ? (config.topics ?? []) : (existing?.topics ?? []),
+    customTopics: isTopics ? (config.customTopics ?? []) : (existing?.customTopics ?? []),
+    topicDifficulties: isTopics ? (config.topicDifficulties ?? existing?.topicDifficulties) : existing?.topicDifficulties,
+    questionFormats: config.questionFormats ?? existing?.questionFormats,
+    sessionType: config.sessionType,
+    questionCount: count != null && PRESET_QUESTION_COUNTS.includes(count) ? count : (existing?.questionCount ?? 10),
+    customQuestionCount: count != null && !PRESET_QUESTION_COUNTS.includes(count) ? String(count) : '',
+    timeMinutes: mins != null && PRESET_TIME_OPTIONS.includes(mins) ? mins : (existing?.timeMinutes ?? 10),
+    customTime: mins != null && !PRESET_TIME_OPTIONS.includes(mins) ? String(mins) : '',
+    mode: config.mode,
+  };
 }

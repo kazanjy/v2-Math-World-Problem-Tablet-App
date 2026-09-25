@@ -16,6 +16,9 @@ import {
   updateLocalQuestion,
   getLocalSessions,
   getLocalSessionQuestions,
+  getSavedSettings,
+  saveSettings,
+  configToSavedSettings,
 } from '../lib/localStorage';
 import { useAuthStore } from './authStore';
 
@@ -140,6 +143,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   startSession: async (userId: string) => {
     const { config } = get();
     if (!config) return;
+
+    // Remember this configuration as the config page's defaults, no matter
+    // where the session was launched from (config page, History "Start Again",
+    // or "Same Settings"). Cancelling and choosing "New Session" then shows the
+    // settings of the session that was just running.
+    saveSettings(configToSavedSettings(config, getSavedSettings()));
 
     set({ isLoading: true });
 
