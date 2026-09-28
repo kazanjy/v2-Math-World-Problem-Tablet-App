@@ -75,7 +75,7 @@ function formatMathText(input: string): string {
 function buildQuestionPrompt(params: GenerateQuestionParams): string {
   const {
     theme, customTheme, gradeLevel, topics, customTopics, topicDifficulties, format,
-    previousQuestion, previousGenre, previousSubTopic, recentSubTopics,
+    previousQuestion, previousSubTopic, recentSubTopics,
     selectedTopic, isRetry, retryGenre, retrySubTopic,
   } = params;
 
@@ -105,14 +105,16 @@ function buildQuestionPrompt(params: GenerateQuestionParams): string {
 
   let prompt: string;
 
-  if (isTopicMode) {
-    const topicToUse = selectedTopic || allTopics[0];
-    const topicList = selectedTopic ? selectedTopic : allTopics.join(', ');
+  // A single topic (preset or custom) — or the one randomly selected for this
+  // question — is the *focus*: the problem must be about it and nothing else.
+  const focusTopic = selectedTopic || (allTopics.length === 1 ? allTopics[0] : undefined);
+  const isCustomFocus = focusTopic ? freeTopics.includes(focusTopic) : false;
 
+  if (isTopicMode) {
     let difficultyConstraints = '';
     if (topicDifficulties) {
-      const presetToConstrain = selectedTopic
-        ? presetTopics.filter(t => t === selectedTopic)
+      const presetToConstrain = focusTopic
+        ? presetTopics.filter(t => t === focusTopic)
         : presetTopics;
       const constraints = presetToConstrain.map(topic => {
         const difficulties = topicDifficulties[topic];
@@ -131,30 +133,30 @@ ${constraints.join('\n')}
       }
     }
 
+    // Variety stays WITHIN the topic. The previous "pick a completely different
+    // concept / avoid these categories" rules contradicted a single-topic
+    // session and made the model drift off-topic. Rotation across multiple
+    // topics is already handled by choosing a focus topic per question.
     let varietyConstraints = '';
-    if (previousGenre || previousSubTopic || (recentSubTopics && recentSubTopics.length > 0)) {
-      varietyConstraints = '\nVARIETY REQUIREMENTS (CRITICAL - MUST FOLLOW):\n';
-      const recentCategories = new Set<string>();
-      if (recentSubTopics) {
-        for (const subTopic of recentSubTopics) {
-          const category = subTopic.split('-')[0];
-          if (category) recentCategories.add(category);
-        }
-      }
-      if (previousGenre) {
-        varietyConstraints += `- The previous question was "${previousGenre}"${previousSubTopic ? ` with sub-topic "${previousSubTopic}"` : ''}. Choose a COMPLETELY DIFFERENT concept.\n`;
+    if (previousQuestion || previousSubTopic || (recentSubTopics && recentSubTopics.length > 0)) {
+      varietyConstraints = '\nVARIETY (within the topic only):\n';
+      varietyConstraints += '- Use different numbers and a different scenario from recent problems.\n';
+      if (previousSubTopic && previousSubTopic !== 'general') {
+        varietyConstraints += `- The previous problem practiced the sub-skill "${previousSubTopic}"; prefer a different sub-skill of the SAME topic if the topic has several.\n`;
       }
       if (recentSubTopics && recentSubTopics.length > 0) {
-        varietyConstraints += `- DO NOT use any of these recently used sub-topics: ${recentSubTopics.join(', ')}\n`;
+        varietyConstraints += `- Where the topic allows, avoid repeating these recently used sub-skills: ${recentSubTopics.join(', ')}.\n`;
       }
-      if (recentCategories.size > 0) {
-        varietyConstraints += `- AVOID these concept categories entirely (they've been used recently): ${Array.from(recentCategories).join(', ')}\n`;
-        varietyConstraints += `- For example, if "perimeter" is listed, do NOT pick perimeter-triangles, perimeter-irregular, etc.\n`;
-      }
-      varietyConstraints += `- Pick a FRESH concept that is fundamentally different from recent questions.\n`;
+      varietyConstraints += '- NEVER change the topic itself to achieve variety.\n';
     }
 
-    prompt = `Generate a ${problemNoun} focusing on ${selectedTopic ? `this topic: ${topicToUse}` : `one of these topics: ${topicList}`}.
+    const topicDirective = focusTopic
+      ? `Generate a ${problemNoun} about EXACTLY this topic: "${focusTopic}".
+The problem MUST test this topic and nothing else — do NOT drift to any other concept, operation, or topic.${isCustomFocus ? `\nThis is a custom topic chosen by the user and it is authoritative. The sub-topic examples list further below is general reference only — do NOT pick a concept from it that falls outside "${focusTopic}".` : ''}`
+      : `Generate a ${problemNoun} about one of these topics ONLY: ${allTopics.join(', ')}.
+The problem MUST be about one of those topics and nothing else.`;
+
+    prompt = `${topicDirective}
 ${themeBlock}${difficultyConstraints}${varietyConstraints}
 `;
   } else {
@@ -166,11 +168,16 @@ ${themeBlock}
 
   if (isRetry && retryGenre) {
     prompt += `The student struggled with this concept: ${retryGenre}${retrySubTopic && retrySubTopic !== 'general' ? ` (specifically the sub-topic: ${retrySubTopic})` : ''}
-Generate a similar problem testing the same skill at the same difficulty, but with different numbers and a different story context.
+Generate a similar problem testing the same skill at the same difficulty, but with different numbers and a different story context.${focusTopic ? ` It must still be about the topic "${focusTopic}".` : ''}
 
 `;
   } else if (previousQuestion) {
-    prompt += `The previous question was: "${previousQuestion}"
+    prompt += isTopicMode
+      ? `The previous question was: "${previousQuestion}"
+Do NOT repeat it — use different numbers and a different scenario — but stay on the same topic.
+
+`
+      : `The previous question was: "${previousQuestion}"
 Generate a DIFFERENT type of math problem (different operation or concept).
 
 `;
@@ -199,7 +206,7 @@ Sub-topic examples by genre (with difficulty hints E=Easy, M=Medium, H=Hard, SH=
 
   if (isTopicMode) {
     prompt += `Requirements:
-- Focus on one of these topics: ${allTopics.join(', ')}
+- TOPIC (authoritative): ${focusTopic ? `exactly "${focusTopic}"` : `one of: ${allTopics.join(', ')}`} — do NOT generate a problem about any other topic.
 - The answer MUST be a single value (a whole number, decimal, or a fraction written as one value like "3/4" or "0.75") — never a list, pair, or multiple values. Even for a custom topic, design the problem so it has exactly ONE such answer.
 - If the exact answer is irrational (e.g. involves π or a square root, as often happens in trigonometry, pre-calculus, or geometry), give a decimal rounded to 2 decimal places (e.g. 0.87) so the answer is a single clean number.
 - The problem MUST be fully solvable from the information given, with a valid, well-defined answer. NEVER generate an impossible, contradictory, under-specified, or undefined problem (e.g. missing information, or division by zero).${formatRequirement}

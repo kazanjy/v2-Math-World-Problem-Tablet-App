@@ -19,6 +19,7 @@ import {
   getSavedSettings,
   saveSettings,
   configToSavedSettings,
+  addRecentCustomTopics,
 } from '../lib/localStorage';
 import { useAuthStore } from './authStore';
 
@@ -149,6 +150,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // or "Same Settings"). Cancelling and choosing "New Session" then shows the
     // settings of the session that was just running.
     saveSettings(configToSavedSettings(config, getSavedSettings()));
+    if (config.customTopics && config.customTopics.length > 0) {
+      addRecentCustomTopics(config.customTopics);
+    }
 
     set({ isLoading: true });
 
@@ -234,7 +238,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     // variety). A single-topic pool still passes the one topic explicitly.
     const topicPool: string[] = [...(config.topics ?? []), ...(config.customTopics ?? [])];
     let selectedTopic: string | undefined;
-    if (topicPool.length > 0 && !isRetry) {
+    // A single-topic pool always focuses that topic (even on retries), so the
+    // session never drifts away from it. With several topics, pick one at
+    // random per question for rotation (retries steer by genre instead).
+    if (topicPool.length === 1) {
+      selectedTopic = topicPool[0];
+    } else if (topicPool.length > 1 && !isRetry) {
       selectedTopic = topicPool[Math.floor(Math.random() * topicPool.length)];
     }
 

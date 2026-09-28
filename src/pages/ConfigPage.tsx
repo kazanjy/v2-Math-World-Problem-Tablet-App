@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
-import { getSavedSettings, saveSettings, PRESET_QUESTION_COUNTS, PRESET_TIME_OPTIONS } from '../lib/localStorage';
+import { getSavedSettings, saveSettings, getRecentCustomTopics, PRESET_QUESTION_COUNTS, PRESET_TIME_OPTIONS } from '../lib/localStorage';
 import type { SelectionMode } from '../lib/localStorage';
 import type { Theme, GradeLevel, SessionType, SessionMode, Topic, Difficulty, TopicDifficultySettings, QuestionFormat } from '../types';
 import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS, DIFFICULTIES, DIFFICULTY_LABELS, DIFFICULTY_FULL_LABELS, QUESTION_FORMATS, QUESTION_FORMAT_LABELS, QUESTION_FORMAT_DESCRIPTIONS } from '../types';
@@ -23,6 +23,20 @@ export function ConfigPage() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [customTopics, setCustomTopics] = useState<string[]>([]);
   const [customTopicInput, setCustomTopicInput] = useState('');
+  // Recently used custom ("special") topics, offered in a dropdown when the
+  // input is focused. Tapping one adds it to the selected custom topics.
+  const [recentTopics, setRecentTopics] = useState<string[]>([]);
+  const [showRecent, setShowRecent] = useState(false);
+  useEffect(() => {
+    setRecentTopics(getRecentCustomTopics());
+  }, []);
+  // Recents not already selected, filtered by whatever has been typed so far.
+  const recentTopicQuery = customTopicInput.trim().toLowerCase();
+  const recentTopicOptions = recentTopics.filter(
+    (t) =>
+      !customTopics.some((c) => c.toLowerCase() === t.toLowerCase()) &&
+      (recentTopicQuery === '' || t.toLowerCase().includes(recentTopicQuery))
+  );
   const [topicDifficulties, setTopicDifficulties] = useState<TopicDifficultySettings>(() => {
     // Default: all difficulties enabled for all topics
     const defaults: TopicDifficultySettings = {} as TopicDifficultySettings;
@@ -73,13 +87,18 @@ export function ConfigPage() {
     );
   };
 
-  // Add the typed custom topic (trimmed, de-duplicated, case-insensitive).
-  const addCustomTopic = () => {
-    const value = customTopicInput.trim();
+  // Add a custom topic (trimmed, de-duplicated, case-insensitive).
+  const addCustomTopicValue = (raw: string) => {
+    const value = raw.trim();
     if (!value) return;
     setCustomTopics(prev =>
       prev.some(t => t.toLowerCase() === value.toLowerCase()) ? prev : [...prev, value]
     );
+  };
+
+  // Add whatever was typed in the input, then clear it.
+  const addCustomTopic = () => {
+    addCustomTopicValue(customTopicInput);
     setCustomTopicInput('');
   };
 
@@ -328,19 +347,47 @@ export function ConfigPage() {
                     Add your own topic
                   </label>
                   <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={customTopicInput}
-                      onChange={(e) => setCustomTopicInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addCustomTopic();
-                        }
-                      }}
-                      placeholder="e.g., Lowest common denominators"
-                      className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={customTopicInput}
+                        onChange={(e) => setCustomTopicInput(e.target.value)}
+                        onFocus={() => setShowRecent(true)}
+                        onBlur={() => setShowRecent(false)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addCustomTopic();
+                          }
+                        }}
+                        placeholder="e.g., Lowest common denominators"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      />
+
+                      {/* Most recent special topics — tap to add to the selection */}
+                      {showRecent && recentTopicOptions.length > 0 && (
+                        <div
+                          // Keep the input focused when tapping an option so the
+                          // list stays open and several can be added in a row.
+                          onMouseDown={(e) => e.preventDefault()}
+                          className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                        >
+                          <div className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-200">
+                            Most recent special topics — tap to add
+                          </div>
+                          {recentTopicOptions.map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => addCustomTopicValue(t)}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 active:bg-indigo-100 transition-colors"
+                            >
+                              + {t}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={addCustomTopic}

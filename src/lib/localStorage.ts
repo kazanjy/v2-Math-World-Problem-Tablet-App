@@ -5,6 +5,7 @@ const STORAGE_KEYS = {
   SESSIONS: 'mmg_sessions',
   QUESTIONS: 'mmg_questions',
   SETTINGS: 'mmg_settings',
+  RECENT_CUSTOM_TOPICS: 'mmg_recent_custom_topics',
 };
 
 // Profile helpers
@@ -189,4 +190,36 @@ export function configToSavedSettings(config: SessionConfig, existing?: SavedSet
     customTime: mins != null && !PRESET_TIME_OPTIONS.includes(mins) ? String(mins) : '',
     mode: config.mode,
   };
+}
+
+// Recently used custom ("special") topics, most recent first, offered as a
+// quick-add dropdown on the config page. Updated whenever a session starts
+// with custom topics.
+const MAX_RECENT_CUSTOM_TOPICS = 12;
+
+export function getRecentCustomTopics(): string[] {
+  const data = localStorage.getItem(STORAGE_KEYS.RECENT_CUSTOM_TOPICS);
+  if (!data) return [];
+  try {
+    const parsed: unknown = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed.filter((t): t is string => typeof t === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function addRecentCustomTopics(topics: string[]): void {
+  const incoming = topics.map(t => t.trim()).filter(Boolean);
+  if (incoming.length === 0) return;
+  // New topics go to the front; de-duplicate case-insensitively; cap the list.
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const t of [...incoming, ...getRecentCustomTopics()]) {
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(t);
+    if (merged.length >= MAX_RECENT_CUSTOM_TOPICS) break;
+  }
+  localStorage.setItem(STORAGE_KEYS.RECENT_CUSTOM_TOPICS, JSON.stringify(merged));
 }
