@@ -1,0 +1,100 @@
+<!--
+  Supabase email template: Magic Link (sign-in)
+
+  Where to use it:
+    Supabase Dashboard → Authentication → Email Templates → "Magic Link"
+    Paste this entire file into the message body.
+    Suggested subject:  Your sign-in link for Michael's Math Gymnasium
+
+    Apply the same body to "Confirm signup" as well — a brand-new email address
+    signing in with a magic link can receive that template instead.
+
+  Template variables (filled in by Supabase):
+    {{ .ConfirmationURL }}  the one-time sign-in link
+    {{ .Email }}            the recipient's address
+    {{ .SiteURL }}          the app's Site URL
+
+  Built for email clients (Gmail, Apple Mail, iMessage previews): table-based
+  layout, inline styles only, explicit background colors (dark-mode friendly),
+  and a bulletproof button.
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>Your sign-in link</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#eef2ff;">
+    <!-- Preheader (shown in the inbox preview, hidden in the body) -->
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent; font-size:1px; line-height:1px;">
+      Tap the button to sign in to Michael's Math Gymnasium. This link works once and expires soon.
+    </div>
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#eef2ff" style="background-color:#eef2ff;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px; width:100%;">
+
+            <!-- Header band -->
+            <tr>
+              <td align="center" bgcolor="#3b82f6" style="background-color:#3b82f6; border-radius:16px 16px 0 0; padding:28px 24px;">
+                <div style="font-size:44px; line-height:1;">🏋️</div>
+                <div style="font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:22px; font-weight:800; color:#ffffff; margin-top:10px;">
+                  Michael's Math Gymnasium
+                </div>
+              </td>
+            </tr>
+
+            <!-- Card body -->
+            <tr>
+              <td bgcolor="#ffffff" style="background-color:#ffffff; border-radius:0 0 16px 16px; padding:32px 28px;">
+                <div style="font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#111827;">
+                  <h1 style="margin:0 0 12px; font-size:24px; font-weight:800; color:#111827;">Your sign-in link</h1>
+                  <p style="margin:0 0 24px; font-size:16px; line-height:1.55; color:#4b5563;">
+                    Tap the button below to sign in as <strong style="color:#111827;">{{ .Email }}</strong>.
+                    No password needed.
+                  </p>
+
+                  <!-- Bulletproof button -->
+                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 24px;">
+                    <tr>
+                      <td align="center" bgcolor="#2563eb" style="background-color:#2563eb; border-radius:12px;">
+                        <a href="{{ .ConfirmationURL }}"
+                           style="display:inline-block; padding:16px 32px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:18px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:12px;">
+                          Sign in to the Gym &nbsp;→
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p style="margin:0 0 8px; font-size:14px; line-height:1.55; color:#6b7280;">
+                    This link works <strong>once</strong> and expires soon. If you didn't ask for it, you can safely ignore this email — nothing will change.
+                  </p>
+                  <p style="margin:16px 0 0; font-size:12px; line-height:1.55; color:#9ca3af; word-break:break-all;">
+                    Button not working? Copy and paste this link into your browser:<br />
+                    <a href="{{ .ConfirmationURL }}" style="color:#2563eb; text-decoration:underline;">{{ .ConfirmationURL }}</a>
+                  </p>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td align="center" style="padding:20px 16px 0;">
+                <p style="margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:12px; line-height:1.5; color:#6b7280;">
+                  Themed math practice with a stylus scratch pad · <a href="{{ .SiteURL }}" style="color:#4f46e5; text-decoration:none;">Open the app</a>
+                </p>
+              </td>
+            </tr>
+
+          </table>
+
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
