@@ -223,3 +223,25 @@ export function addRecentCustomTopics(topics: string[]): void {
   }
   localStorage.setItem(STORAGE_KEYS.RECENT_CUSTOM_TOPICS, JSON.stringify(merged));
 }
+
+// Recent custom topics for the config page's quick-add dropdown, derived from
+// session history (already newest-first) so every past session shown on the
+// History page counts — including ones from before the recents list existed.
+// The separately recorded recents are merged in afterwards as a fallback.
+export function recentCustomTopicsFromSessions(sessions: Session[]): string[] {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  const push = (raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    const key = value.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(value);
+  };
+  for (const session of sessions) {
+    for (const topic of session.customTopics ?? []) push(topic);
+  }
+  for (const topic of getRecentCustomTopics()) push(topic);
+  return merged.slice(0, MAX_RECENT_CUSTOM_TOPICS);
+}

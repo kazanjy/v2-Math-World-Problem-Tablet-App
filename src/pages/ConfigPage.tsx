@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
-import { getSavedSettings, saveSettings, getRecentCustomTopics, PRESET_QUESTION_COUNTS, PRESET_TIME_OPTIONS } from '../lib/localStorage';
+import { getSavedSettings, saveSettings, recentCustomTopicsFromSessions, PRESET_QUESTION_COUNTS, PRESET_TIME_OPTIONS } from '../lib/localStorage';
 import type { SelectionMode } from '../lib/localStorage';
 import type { Theme, GradeLevel, SessionType, SessionMode, Topic, Difficulty, TopicDifficultySettings, QuestionFormat } from '../types';
 import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS, DIFFICULTIES, DIFFICULTY_LABELS, DIFFICULTY_FULL_LABELS, QUESTION_FORMATS, QUESTION_FORMAT_LABELS, QUESTION_FORMAT_DESCRIPTIONS } from '../types';
@@ -10,7 +10,7 @@ import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS, DIFFICULTIES, DIFFICU
 export function ConfigPage() {
   const navigate = useNavigate();
   const { profile, logout } = useAuthStore();
-  const { setConfig, startSession } = useSessionStore();
+  const { setConfig, startSession, getSessionHistory } = useSessionStore();
 
   // Local loading state for the entire startup process
   const [isStarting, setIsStarting] = useState(false);
@@ -27,9 +27,16 @@ export function ConfigPage() {
   // input is focused. Tapping one adds it to the selected custom topics.
   const [recentTopics, setRecentTopics] = useState<string[]>([]);
   const [showRecent, setShowRecent] = useState(false);
+  // Derive recents from session history (the sessions on the History page),
+  // so past custom topics are offered — not just ones from newly started
+  // sessions. Falls back to the locally recorded recents if history fails.
   useEffect(() => {
-    setRecentTopics(getRecentCustomTopics());
-  }, []);
+    let active = true;
+    getSessionHistory()
+      .then((sessions) => { if (active) setRecentTopics(recentCustomTopicsFromSessions(sessions)); })
+      .catch(() => { if (active) setRecentTopics(recentCustomTopicsFromSessions([])); });
+    return () => { active = false; };
+  }, [getSessionHistory]);
   // Recents not already selected, filtered by whatever has been typed so far.
   const recentTopicQuery = customTopicInput.trim().toLowerCase();
   const recentTopicOptions = recentTopics.filter(
