@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSessionStore } from '../stores/sessionStore';
@@ -6,6 +7,66 @@ import { getSavedSettings, saveSettings, recentCustomTopicsFromSessions, PRESET_
 import type { SelectionMode } from '../lib/localStorage';
 import type { Theme, GradeLevel, SessionType, SessionMode, Topic, Difficulty, TopicDifficultySettings, QuestionFormat } from '../types';
 import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS, DIFFICULTIES, DIFFICULTY_LABELS, DIFFICULTY_FULL_LABELS, QUESTION_FORMATS, QUESTION_FORMAT_LABELS, QUESTION_FORMAT_DESCRIPTIONS } from '../types';
+
+// Visual flair for the pickers.
+const THEME_EMOJI: Record<Theme, string> = {
+  football: '🏈',
+  baseball: '⚾',
+  princesses: '👑',
+  pokemon: '⚡',
+  minecraft: '⛏️',
+  lego: '🧱',
+  standard: '🌍',
+  custom: '✨',
+};
+
+const TOPIC_EMOJI: Record<Topic, string> = {
+  'addition': '➕',
+  'subtraction': '➖',
+  'multiplication': '✖️',
+  'division': '➗',
+  'fractions': '🍕',
+  'decimals': '🔟',
+  'percentages': '💯',
+  'integers': '🌡️',
+  'exponents-roots': '🧮',
+  'statistics': '📊',
+  'word-problems': '📖',
+  'pre-algebra': '🔤',
+  'algebra': '🧩',
+  'geometry': '📐',
+  'trigonometry': '📏',
+  'pre-calculus': '📈',
+  'calculus': '∫',
+};
+
+// A settings section: white card with a colored icon bubble in the header.
+function SectionCard({
+  icon,
+  title,
+  subtitle,
+  accent,
+  children,
+}: {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  accent: string; // tailwind bg class for the icon bubble
+  children: ReactNode;
+}) {
+  return (
+    <section className="bg-white rounded-2xl shadow-xl p-5 sm:p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`w-10 h-10 rounded-xl ${accent} flex items-center justify-center text-xl shadow-sm`}>{icon}</div>
+        <div>
+          <h2 className="text-lg font-bold text-gray-800 leading-tight">{title}</h2>
+          {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export function ConfigPage() {
   const navigate = useNavigate();
@@ -24,6 +85,9 @@ export function ConfigPage() {
     if (!error) setLinkSent(true);
   };
 
+  // Progress stats for the welcome strip, derived from session history.
+  const [stats, setStats] = useState({ sessions: 0, questions: 0, correct: 0 });
+
   // Form state
   const [theme, setTheme] = useState<Theme>('standard');
   const [customTheme, setCustomTheme] = useState('');
@@ -36,13 +100,22 @@ export function ConfigPage() {
   // input is focused. Tapping one adds it to the selected custom topics.
   const [recentTopics, setRecentTopics] = useState<string[]>([]);
   const [showRecent, setShowRecent] = useState(false);
-  // Derive recents from session history (the sessions on the History page),
-  // so past custom topics are offered — not just ones from newly started
-  // sessions. Falls back to the locally recorded recents if history fails.
+  // Derive recents (and the welcome-strip stats) from session history — the
+  // sessions on the History page — so past custom topics are offered, not
+  // just ones from newly started sessions. Falls back to the locally recorded
+  // recents if history fails.
   useEffect(() => {
     let active = true;
     getSessionHistory()
-      .then((sessions) => { if (active) setRecentTopics(recentCustomTopicsFromSessions(sessions)); })
+      .then((sessions) => {
+        if (!active) return;
+        setRecentTopics(recentCustomTopicsFromSessions(sessions));
+        setStats({
+          sessions: sessions.length,
+          questions: sessions.reduce((sum, s) => sum + (s.totalAttempted || 0), 0),
+          correct: sessions.reduce((sum, s) => sum + (s.totalCorrect || 0), 0),
+        });
+      })
       .catch(() => { if (active) setRecentTopics(recentCustomTopicsFromSessions([])); });
     return () => { active = false; };
   }, [getSessionHistory]);
@@ -197,36 +270,98 @@ export function ConfigPage() {
     }
   };
 
+  // Derived bits for the summary/quick-start UI.
+  const canStart =
+    !isStarting &&
+    !(theme === 'custom' && !customTheme.trim()) &&
+    !(selectionMode === 'topics' && topics.length === 0 && customTopics.length === 0);
+  const effectiveCount = customQuestionCount ? parseInt(customQuestionCount) : questionCount;
+  const effectiveMinutes = customTime ? parseInt(customTime) : timeMinutes;
+  const themeSummary = theme === 'custom' ? (customTheme.trim() || 'Custom theme') : THEME_LABELS[theme];
+  const practiceSummary = selectionMode === 'grade'
+    ? `Grade ${gradeLevel}`
+    : (() => {
+        const names = [...topics.map((t) => TOPIC_LABELS[t]), ...customTopics];
+        if (names.length === 0) return 'No topics yet';
+        return names.length <= 2 ? names.join(' & ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+      })();
+  const styleSummary = questionFormats.map((f) => QUESTION_FORMAT_LABELS[f]).join(' + ');
+  const lengthSummary = sessionType === 'count'
+    ? `${effectiveCount} questions`
+    : `${effectiveMinutes} min · ${mode === 'race' ? 'Race' : 'Chill'}`;
+  const accuracy = stats.questions > 0 ? Math.round((stats.correct / stats.questions) * 100) : null;
+  const firstName = profile?.displayName?.split(/[\s@.]/)[0] || 'there';
+
+  const summaryChips = [
+    { icon: THEME_EMOJI[theme], text: themeSummary },
+    { icon: selectionMode === 'grade' ? '🎓' : '🎯', text: practiceSummary },
+    { icon: questionFormats.includes('numerical') && !questionFormats.includes('word') ? '🔢' : '📖', text: styleSummary },
+    { icon: sessionType === 'count' ? '🔢' : '⏱️', text: lengthSummary },
+  ];
+
+  const startButtonContent = isStarting ? (
+    <span className="flex items-center justify-center gap-3">
+      <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
+      Generating first question...
+    </span>
+  ) : (
+    '🏋️ Start Training!'
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-500 to-purple-600 p-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Michael's Math Gymnasium</h1>
-            <p className="text-blue-100">Welcome, {profile?.displayName}!</p>
+    <div className="min-h-screen bg-gradient-to-b from-blue-500 via-indigo-600 to-purple-700 p-4 pb-28">
+      <div className="max-w-3xl mx-auto space-y-5">
+        {/* Welcome strip */}
+        <header className="text-white">
+          <div className="flex flex-wrap justify-between items-start gap-3">
+            <div>
+              <p className="text-sm font-semibold text-blue-100 tracking-wide uppercase">Michael's Math Gymnasium</p>
+              <h1 className="text-3xl sm:text-4xl font-extrabold mt-1">
+                Welcome back, {firstName}! <span className="inline-block">🏋️</span>
+              </h1>
+              <p className="text-blue-100 mt-1">Ready to train your brain? Set up a session below.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/history')}
+                className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                📚 History
+              </button>
+              <button
+                onClick={logout}
+                className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('/history')}
-              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              History
-            </button>
-            <button
-              onClick={logout}
-              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              Sign Out
-            </button>
+
+          {/* Progress stats */}
+          <div className="grid grid-cols-3 gap-3 mt-5">
+            <div className="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
+              <div className="text-3xl font-extrabold">{stats.sessions}</div>
+              <div className="text-xs sm:text-sm text-blue-100 mt-1">Sessions</div>
+            </div>
+            <div className="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
+              <div className="text-3xl font-extrabold">{stats.questions}</div>
+              <div className="text-xs sm:text-sm text-blue-100 mt-1">Questions</div>
+            </div>
+            <div className="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
+              <div className="text-3xl font-extrabold">{accuracy === null ? '—' : `${accuracy}%`}</div>
+              <div className="text-xs sm:text-sm text-blue-100 mt-1">Accuracy</div>
+            </div>
           </div>
-        </div>
+        </header>
 
         {/* Local-play notice: a backend is configured but this device hasn't
             signed in yet. Tapping the emailed link merges local play into the
             account and switches to cloud storage. */}
         {!isDemoMode && isUsingDemoLogin && (
-          <div className="mb-4 bg-white/15 border border-white/30 text-white rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-white/15 border border-white/30 text-white rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm">
               <span className="font-semibold">Playing locally as {profile?.email}.</span>{' '}
               Tap the sign-in link we emailed you to save your progress to your account and sync across devices.
@@ -241,294 +376,311 @@ export function ConfigPage() {
           </div>
         )}
 
-        {/* Configuration Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-6 space-y-6">
-          <h2 className="text-xl font-bold text-gray-800">Configure Your Session</h2>
+        {/* Quick start */}
+        <section className="bg-gradient-to-r from-amber-300 to-orange-400 rounded-2xl shadow-xl p-5 sm:p-6 text-gray-900">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-extrabold">⚡ Quick start</h2>
+              <p className="text-sm text-gray-800/80 mt-0.5">Jump straight in with your current setup — or tweak it below.</p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {summaryChips.map((c) => (
+                  <span key={c.text + c.icon} className="inline-flex items-center gap-1 bg-white/70 text-gray-800 text-sm font-medium px-3 py-1 rounded-full">
+                    <span>{c.icon}</span>{c.text}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={handleStart}
+              disabled={!canStart}
+              className="bg-gray-900 hover:bg-black disabled:bg-gray-500 text-white font-bold py-3 px-6 rounded-xl text-lg shadow-lg transition-colors whitespace-nowrap"
+            >
+              {isStarting ? 'Starting…' : 'Go! →'}
+            </button>
+          </div>
+        </section>
 
-          {/* Theme Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Theme</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {(Object.keys(THEME_LABELS) as Theme[]).map((t) => (
+        {/* Theme */}
+        <SectionCard icon="🎭" title="Pick a theme" subtitle="Every problem gets a story from this world" accent="bg-pink-100">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {(Object.keys(THEME_LABELS) as Theme[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTheme(t)}
+                className={`px-3 py-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${
+                  theme === t
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md scale-[1.02]'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                }`}
+              >
+                <span className="text-3xl leading-none">{THEME_EMOJI[t]}</span>
+                <span className="text-sm font-semibold">{THEME_LABELS[t]}</span>
+              </button>
+            ))}
+          </div>
+          {theme === 'custom' && (
+            <input
+              type="text"
+              value={customTheme}
+              onChange={(e) => setCustomTheme(e.target.value)}
+              placeholder="Enter your custom theme (e.g., Dinosaurs, Space)"
+              className="mt-3 w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          )}
+        </SectionCard>
+
+        {/* Practice by */}
+        <SectionCard icon="🎯" title="What to practice" subtitle="By grade level, or hand-pick the topics" accent="bg-purple-100">
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <button
+              onClick={() => setSelectionMode('grade')}
+              className={`px-4 py-4 rounded-xl border-2 text-left transition-all ${
+                selectionMode === 'grade'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="font-semibold">🎓 Grade Level</div>
+              <div className="text-sm text-gray-500">Age-appropriate mix of topics</div>
+            </button>
+            <button
+              onClick={() => setSelectionMode('topics')}
+              className={`px-4 py-4 rounded-xl border-2 text-left transition-all ${
+                selectionMode === 'topics'
+                  ? 'border-purple-500 bg-purple-50 text-purple-700'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="font-semibold">🎯 Specific Topics</div>
+              <div className="text-sm text-gray-500">Choose what to practice</div>
+            </button>
+          </div>
+
+          {/* Grade Level Selection */}
+          {selectionMode === 'grade' && (
+            <div className="flex flex-wrap gap-2">
+              {GRADE_LEVELS.map((g) => (
                 <button
-                  key={t}
-                  onClick={() => setTheme(t)}
-                  className={`px-4 py-3 rounded-lg border-2 transition-all ${
-                    theme === t
+                  key={g}
+                  onClick={() => setGradeLevel(g)}
+                  className={`px-4 py-3 rounded-xl border-2 min-w-[52px] font-semibold transition-all ${
+                    gradeLevel === g
+                      ? 'border-blue-500 bg-blue-500 text-white shadow-md'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Topics Selection */}
+          {selectionMode === 'topics' && (
+            <div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {TOPICS.map((topic) => (
+                  <div
+                    key={topic}
+                    className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                      topics.includes(topic)
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200'
+                    }`}
+                  >
+                    <button
+                      onClick={() => toggleTopic(topic)}
+                      className={`flex-1 text-left font-medium flex items-center gap-2 ${
+                        topics.includes(topic) ? 'text-purple-700' : 'text-gray-600'
+                      }`}
+                    >
+                      <span className="text-lg leading-none">{TOPIC_EMOJI[topic]}</span>
+                      {TOPIC_LABELS[topic]}
+                    </button>
+                    {topics.includes(topic) && (
+                      <div className="flex gap-1">
+                        {DIFFICULTIES.map((diff) => {
+                          const isEnabled = topicDifficulties[topic]?.includes(diff);
+                          return (
+                            <div key={diff} className="relative group">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleTopicDifficulty(topic, diff);
+                                }}
+                                className={`px-2 py-1 text-xs font-bold rounded transition-all ${
+                                  isEnabled
+                                    ? diff === 'easy' ? 'bg-green-500 text-white' :
+                                      diff === 'medium' ? 'bg-yellow-500 text-white' :
+                                      diff === 'hard' ? 'bg-orange-500 text-white' :
+                                      'bg-red-500 text-white'
+                                    : 'bg-gray-200 text-gray-400'
+                                }`}
+                              >
+                                {DIFFICULTY_LABELS[diff]}
+                              </button>
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                {DIFFICULTY_FULL_LABELS[diff]}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Custom (free-text) topics */}
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ✨ Add your own special topic
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={customTopicInput}
+                      onChange={(e) => setCustomTopicInput(e.target.value)}
+                      onFocus={() => setShowRecent(true)}
+                      onBlur={() => setShowRecent(false)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addCustomTopic();
+                        }
+                      }}
+                      placeholder="e.g., Lowest common denominators"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+
+                    {/* Most recent special topics — tap to add to the selection */}
+                    {showRecent && recentTopicOptions.length > 0 && (
+                      <div
+                        // Keep the input focused when tapping an option so the
+                        // list stays open and several can be added in a row.
+                        onMouseDown={(e) => e.preventDefault()}
+                        className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                      >
+                        <div className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-200">
+                          Most recent special topics — tap to add
+                        </div>
+                        {recentTopicOptions.map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => addCustomTopicValue(t)}
+                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 active:bg-indigo-100 transition-colors"
+                          >
+                            + {t}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addCustomTopic}
+                    disabled={!customTopicInput.trim()}
+                    className="px-5 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Each problem must have a single numeric answer (e.g. a number or a fraction like 3/4).
+                </p>
+
+                {customTopics.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {customTopics.map((t) => (
+                      <span
+                        key={t}
+                        className="inline-flex items-center gap-1.5 bg-indigo-100 text-indigo-700 pl-3 pr-2 py-1.5 rounded-full text-sm font-medium"
+                      >
+                        {t}
+                        <button
+                          type="button"
+                          onClick={() => removeCustomTopic(t)}
+                          className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-indigo-200 text-indigo-500"
+                          aria-label={`Remove ${t}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {topics.length === 0 && customTopics.length === 0 && (
+                <p className="mt-3 text-sm text-amber-600">Select or add at least one topic to continue</p>
+              )}
+            </div>
+          )}
+        </SectionCard>
+
+        {/* Problem style */}
+        <SectionCard icon="🧠" title="Problem style" subtitle="Story problems, plain equations, or both" accent="bg-blue-100">
+          <div className="grid grid-cols-2 gap-3">
+            {QUESTION_FORMATS.map((fmt) => {
+              const selected = questionFormats.includes(fmt);
+              return (
+                <button
+                  key={fmt}
+                  onClick={() => toggleFormat(fmt)}
+                  className={`px-4 py-4 rounded-xl border-2 text-left transition-all ${
+                    selected
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  {THEME_LABELS[t]}
-                </button>
-              ))}
-            </div>
-            {theme === 'custom' && (
-              <input
-                type="text"
-                value={customTheme}
-                onChange={(e) => setCustomTheme(e.target.value)}
-                placeholder="Enter your custom theme (e.g., Dinosaurs, Space)"
-                className="mt-3 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            )}
-          </div>
-
-          {/* Selection Mode Toggle */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Practice By</label>
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <button
-                onClick={() => setSelectionMode('grade')}
-                className={`px-4 py-4 rounded-lg border-2 transition-all ${
-                  selectionMode === 'grade'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-semibold">Grade Level</div>
-                <div className="text-sm text-gray-500">Age-appropriate mix of topics</div>
-              </button>
-              <button
-                onClick={() => setSelectionMode('topics')}
-                className={`px-4 py-4 rounded-lg border-2 transition-all ${
-                  selectionMode === 'topics'
-                    ? 'border-purple-500 bg-purple-50 text-purple-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-semibold">Specific Topics</div>
-                <div className="text-sm text-gray-500">Choose what to practice</div>
-              </button>
-            </div>
-
-            {/* Grade Level Selection */}
-            {selectionMode === 'grade' && (
-              <div className="flex flex-wrap gap-2">
-                {GRADE_LEVELS.map((g) => (
-                  <button
-                    key={g}
-                    onClick={() => setGradeLevel(g)}
-                    className={`px-4 py-3 rounded-lg border-2 min-w-[50px] transition-all ${
-                      gradeLevel === g
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Topics Selection */}
-            {selectionMode === 'topics' && (
-              <div>
-                <div className="space-y-2">
-                  {TOPICS.map((topic) => (
-                    <div
-                      key={topic}
-                      className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all ${
-                        topics.includes(topic)
-                          ? 'border-purple-500 bg-purple-50'
-                          : 'border-gray-200'
-                      }`}
-                    >
-                      <button
-                        onClick={() => toggleTopic(topic)}
-                        className={`flex-1 text-left font-medium ${
-                          topics.includes(topic) ? 'text-purple-700' : 'text-gray-600'
-                        }`}
-                      >
-                        {TOPIC_LABELS[topic]}
-                      </button>
-                      {topics.includes(topic) && (
-                        <div className="flex gap-1">
-                          {DIFFICULTIES.map((diff) => {
-                            const isEnabled = topicDifficulties[topic]?.includes(diff);
-                            return (
-                              <div key={diff} className="relative group">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleTopicDifficulty(topic, diff);
-                                  }}
-                                  className={`px-2 py-1 text-xs font-bold rounded transition-all ${
-                                    isEnabled
-                                      ? diff === 'easy' ? 'bg-green-500 text-white' :
-                                        diff === 'medium' ? 'bg-yellow-500 text-white' :
-                                        diff === 'hard' ? 'bg-orange-500 text-white' :
-                                        'bg-red-500 text-white'
-                                      : 'bg-gray-200 text-gray-400'
-                                  }`}
-                                >
-                                  {DIFFICULTY_LABELS[diff]}
-                                </button>
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                  {DIFFICULTY_FULL_LABELS[diff]}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Custom (free-text) topics */}
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Add your own topic
-                  </label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        value={customTopicInput}
-                        onChange={(e) => setCustomTopicInput(e.target.value)}
-                        onFocus={() => setShowRecent(true)}
-                        onBlur={() => setShowRecent(false)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addCustomTopic();
-                          }
-                        }}
-                        placeholder="e.g., Lowest common denominators"
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                      />
-
-                      {/* Most recent special topics — tap to add to the selection */}
-                      {showRecent && recentTopicOptions.length > 0 && (
-                        <div
-                          // Keep the input focused when tapping an option so the
-                          // list stays open and several can be added in a row.
-                          onMouseDown={(e) => e.preventDefault()}
-                          className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border-2 border-gray-200 rounded-lg shadow-lg overflow-hidden"
-                        >
-                          <div className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-200">
-                            Most recent special topics — tap to add
-                          </div>
-                          {recentTopicOptions.map((t) => (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() => addCustomTopicValue(t)}
-                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 active:bg-indigo-100 transition-colors"
-                            >
-                              + {t}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addCustomTopic}
-                      disabled={!customTopicInput.trim()}
-                      className="px-5 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
-                    >
-                      Add
-                    </button>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-5 h-5 rounded flex items-center justify-center text-xs ${
+                      selected ? 'bg-blue-500 text-white' : 'bg-gray-200 text-transparent'
+                    }`}>✓</span>
+                    <span className="font-semibold">{fmt === 'word' ? '📖 ' : '🔢 '}{QUESTION_FORMAT_LABELS[fmt]}</span>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Each problem must have a single numeric answer (e.g. a number or a fraction like 3/4).
-                  </p>
-
-                  {customTopics.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {customTopics.map((t) => (
-                        <span
-                          key={t}
-                          className="inline-flex items-center gap-1.5 bg-indigo-100 text-indigo-700 pl-3 pr-2 py-1.5 rounded-full text-sm font-medium"
-                        >
-                          {t}
-                          <button
-                            type="button"
-                            onClick={() => removeCustomTopic(t)}
-                            className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-indigo-200 text-indigo-500"
-                            aria-label={`Remove ${t}`}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {topics.length === 0 && customTopics.length === 0 && (
-                  <p className="mt-3 text-sm text-amber-600">Select or add at least one topic to continue</p>
-                )}
-              </div>
-            )}
+                  <div className="text-sm text-gray-500 mt-1">{QUESTION_FORMAT_DESCRIPTIONS[fmt]}</div>
+                </button>
+              );
+            })}
           </div>
+          {questionFormats.length === 2 && (
+            <p className="mt-2 text-xs text-gray-500">Both selected — questions will mix word problems and plain equations.</p>
+          )}
+        </SectionCard>
 
-          {/* Problem Style */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Problem Style</label>
-            <div className="grid grid-cols-2 gap-3">
-              {QUESTION_FORMATS.map((fmt) => {
-                const selected = questionFormats.includes(fmt);
-                return (
-                  <button
-                    key={fmt}
-                    onClick={() => toggleFormat(fmt)}
-                    className={`px-4 py-4 rounded-lg border-2 text-left transition-all ${
-                      selected
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`w-5 h-5 rounded flex items-center justify-center text-xs ${
-                        selected ? 'bg-blue-500 text-white' : 'bg-gray-200 text-transparent'
-                      }`}>✓</span>
-                      <span className="font-semibold">{QUESTION_FORMAT_LABELS[fmt]}</span>
-                    </div>
-                    <div className="text-sm text-gray-500 mt-1">{QUESTION_FORMAT_DESCRIPTIONS[fmt]}</div>
-                  </button>
-                );
-              })}
-            </div>
-            {questionFormats.length === 2 && (
-              <p className="mt-2 text-xs text-gray-500">Both selected — questions will mix word problems and plain equations.</p>
-            )}
-          </div>
-
-          {/* Session Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Session Type</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setSessionType('count')}
-                className={`px-4 py-4 rounded-lg border-2 transition-all ${
-                  sessionType === 'count'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-semibold">Question Count</div>
-                <div className="text-sm text-gray-500">Answer a set number of questions</div>
-              </button>
-              <button
-                onClick={() => setSessionType('timed')}
-                className={`px-4 py-4 rounded-lg border-2 transition-all ${
-                  sessionType === 'timed'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="font-semibold">Timed Session</div>
-                <div className="text-sm text-gray-500">Practice for a set duration</div>
-              </button>
-            </div>
+        {/* Session length */}
+        <SectionCard icon="⏱️" title="How long" subtitle="A set number of questions, or a timer" accent="bg-green-100">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setSessionType('count')}
+              className={`px-4 py-4 rounded-xl border-2 text-left transition-all ${
+                sessionType === 'count'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="font-semibold">🔢 Question Count</div>
+              <div className="text-sm text-gray-500">Answer a set number of questions</div>
+            </button>
+            <button
+              onClick={() => setSessionType('timed')}
+              className={`px-4 py-4 rounded-xl border-2 text-left transition-all ${
+                sessionType === 'timed'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="font-semibold">⏱️ Timed Session</div>
+              <div className="text-sm text-gray-500">Practice for a set duration</div>
+            </button>
           </div>
 
           {/* Question Count or Time Options */}
           {sessionType === 'count' ? (
-            <div>
+            <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Number of Questions
               </label>
@@ -540,10 +692,10 @@ export function ConfigPage() {
                       setQuestionCount(n);
                       setCustomQuestionCount('');
                     }}
-                    className={`px-4 py-3 rounded-lg border-2 min-w-[60px] transition-all ${
+                    className={`px-4 py-3 rounded-xl border-2 min-w-[60px] font-semibold transition-all ${
                       questionCount === n && !customQuestionCount
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-500 text-white shadow-md'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
                     }`}
                   >
                     {n}
@@ -556,7 +708,7 @@ export function ConfigPage() {
                   placeholder="Custom"
                   min={1}
                   max={100}
-                  className={`px-4 py-3 border-2 rounded-lg w-24 transition-all ${
+                  className={`px-4 py-3 border-2 rounded-xl w-24 transition-all ${
                     customQuestionCount
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200'
@@ -565,7 +717,7 @@ export function ConfigPage() {
               </div>
             </div>
           ) : (
-            <div>
+            <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Session Duration (minutes)
               </label>
@@ -577,10 +729,10 @@ export function ConfigPage() {
                       setTimeMinutes(n);
                       setCustomTime('');
                     }}
-                    className={`px-4 py-3 rounded-lg border-2 min-w-[60px] transition-all ${
+                    className={`px-4 py-3 rounded-xl border-2 min-w-[60px] font-semibold transition-all ${
                       timeMinutes === n && !customTime
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-500 text-white shadow-md'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
                     }`}
                   >
                     {n} min
@@ -593,7 +745,7 @@ export function ConfigPage() {
                   placeholder="Custom"
                   min={1}
                   max={60}
-                  className={`px-4 py-3 border-2 rounded-lg w-24 transition-all ${
+                  className={`px-4 py-3 border-2 rounded-xl w-24 transition-all ${
                     customTime
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200'
@@ -605,59 +757,56 @@ export function ConfigPage() {
 
           {/* Mode Selection (only for timed) */}
           {sessionType === 'timed' && (
-            <div>
+            <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Timer Mode
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setMode('chill')}
-                  className={`px-4 py-4 rounded-lg border-2 transition-all ${
+                  className={`px-4 py-4 rounded-xl border-2 text-left transition-all ${
                     mode === 'chill'
                       ? 'border-green-500 bg-green-50 text-green-700'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold">Chill Mode</div>
+                  <div className="font-semibold">😌 Chill Mode</div>
                   <div className="text-sm text-gray-500">Finish current question when time ends</div>
                 </button>
                 <button
                   onClick={() => setMode('race')}
-                  className={`px-4 py-4 rounded-lg border-2 transition-all ${
+                  className={`px-4 py-4 rounded-xl border-2 text-left transition-all ${
                     mode === 'race'
                       ? 'border-orange-500 bg-orange-50 text-orange-700'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold">Race Mode</div>
+                  <div className="font-semibold">🏁 Race Mode</div>
                   <div className="text-sm text-gray-500">Session ends immediately at time</div>
                 </button>
               </div>
             </div>
           )}
+        </SectionCard>
 
-          {/* Start Button */}
-          <button
-            onClick={handleStart}
-            disabled={
-              isStarting ||
-              (theme === 'custom' && !customTheme.trim()) ||
-              (selectionMode === 'topics' && topics.length === 0 && customTopics.length === 0)
-            }
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 px-6 rounded-xl text-xl transition-all shadow-lg hover:shadow-xl"
-          >
-            {isStarting ? (
-              <span className="flex items-center justify-center gap-3">
-                <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Generating first question...
-              </span>
-            ) : (
-              'Start Training!'
-            )}
-          </button>
+        {/* Sticky start bar: always reachable, shows what's been picked */}
+        <div className="sticky bottom-4 z-30">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-3 sm:p-4 border border-white/60">
+            <div className="flex flex-wrap gap-1.5 mb-3 justify-center">
+              {summaryChips.map((c) => (
+                <span key={c.text + c.icon} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                  <span>{c.icon}</span>{c.text}
+                </span>
+              ))}
+            </div>
+            <button
+              onClick={handleStart}
+              disabled={!canStart}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-bold py-4 px-6 rounded-xl text-xl transition-all shadow-lg hover:shadow-xl"
+            >
+              {startButtonContent}
+            </button>
+          </div>
         </div>
       </div>
     </div>
