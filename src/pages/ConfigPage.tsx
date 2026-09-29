@@ -9,11 +9,20 @@ import { THEME_LABELS, GRADE_LEVELS, TOPICS, TOPIC_LABELS, DIFFICULTIES, DIFFICU
 
 export function ConfigPage() {
   const navigate = useNavigate();
-  const { profile, logout } = useAuthStore();
+  const { profile, logout, login, isDemoMode, isUsingDemoLogin } = useAuthStore();
   const { setConfig, startSession, getSessionHistory } = useSessionStore();
 
   // Local loading state for the entire startup process
   const [isStarting, setIsStarting] = useState(false);
+
+  // Local-play banner: lets the user (re)send the sign-in link that merges
+  // this device's play into their account.
+  const [linkSent, setLinkSent] = useState(false);
+  const handleResendLink = async () => {
+    if (!profile?.email) return;
+    const { error } = await login(profile.email);
+    if (!error) setLinkSent(true);
+  };
 
   // Form state
   const [theme, setTheme] = useState<Theme>('standard');
@@ -212,6 +221,25 @@ export function ConfigPage() {
             </button>
           </div>
         </div>
+
+        {/* Local-play notice: a backend is configured but this device hasn't
+            signed in yet. Tapping the emailed link merges local play into the
+            account and switches to cloud storage. */}
+        {!isDemoMode && isUsingDemoLogin && (
+          <div className="mb-4 bg-white/15 border border-white/30 text-white rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm">
+              <span className="font-semibold">Playing locally as {profile?.email}.</span>{' '}
+              Tap the sign-in link we emailed you to save your progress to your account and sync across devices.
+            </div>
+            <button
+              onClick={handleResendLink}
+              disabled={linkSent}
+              className="text-sm font-semibold bg-white text-blue-700 hover:bg-blue-50 disabled:opacity-70 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {linkSent ? 'Link sent ✓' : 'Resend link'}
+            </button>
+          </div>
+        )}
 
         {/* Configuration Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-6 space-y-6">

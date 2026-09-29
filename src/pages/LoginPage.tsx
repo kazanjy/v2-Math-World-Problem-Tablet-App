@@ -61,72 +61,33 @@ const FEATURES: { icon: string; title: string; description: string }[] = [
   },
 ];
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
-  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { login, loginAsDemo, isLoading, isDemoMode } = useAuthStore();
+  const { startLocalSession, isDemoMode } = useAuthStore();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Email is required, but nothing waits on the network: the student starts
+  // immediately in a local session, and (when a backend is configured) a
+  // sign-in link is emailed in the background to merge that play into their
+  // account whenever they tap it.
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-    if (!email.trim()) {
-      setError('Please enter your email address');
+    const value = email.trim();
+    if (!EMAIL_PATTERN.test(value)) {
+      setError('Please enter a valid email address');
       return;
     }
-
-    const { error: loginError } = await login(email.trim());
-
-    if (loginError) {
-      setError(loginError.message);
-    } else if (isDemoMode) {
-      // In demo mode, login is immediate - redirect to home
-      navigate('/');
-    } else {
-      // In production, show "check your email" message
-      setSubmitted(true);
-    }
-  };
-
-  const handleDemoMode = async () => {
     setError(null);
-    const { error: loginError } = await loginAsDemo();
-
-    if (loginError) {
-      setError(loginError.message);
-    } else {
-      navigate('/');
-    }
+    startLocalSession(value);
+    navigate('/');
   };
 
   const scrollToSignIn = () => {
     document.getElementById('signin')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-500 to-purple-600 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-          <div className="text-6xl mb-4">📧</div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Check Your Email!</h1>
-          <p className="text-gray-600 mb-6">
-            We sent a magic link to <strong>{email}</strong>. Click the link in the email to sign in.
-          </p>
-          <button
-            onClick={() => {
-              setSubmitted(false);
-              setEmail('');
-            }}
-            className="text-blue-600 hover:text-blue-800 underline"
-          >
-            Use a different email
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-500 via-indigo-600 to-purple-700 text-white">
@@ -139,28 +100,14 @@ export function LoginPage() {
             Themed math practice built for a tablet and a stylus — write it out, get instant feedback,
             and understand every mistake.
           </p>
-          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="mt-8 flex justify-center">
             <button
-              onClick={handleDemoMode}
-              disabled={isLoading}
-              className="bg-white text-blue-700 hover:bg-blue-50 disabled:opacity-60 font-bold py-4 px-8 rounded-xl text-lg shadow-lg transition-colors"
+              onClick={scrollToSignIn}
+              className="bg-white text-blue-700 hover:bg-blue-50 font-bold py-4 px-8 rounded-xl text-lg shadow-lg transition-colors"
             >
-              {isLoading ? 'Loading…' : isDemoMode ? 'Start Practicing' : 'Try it now — no account'}
+              Get started →
             </button>
-            {!isDemoMode && (
-              <button
-                onClick={scrollToSignIn}
-                className="bg-white/15 hover:bg-white/25 border border-white/40 text-white font-bold py-4 px-8 rounded-xl text-lg transition-colors"
-              >
-                Sign in with email
-              </button>
-            )}
           </div>
-          {error && (
-            <div className="mt-4 inline-block bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
         </section>
 
         {/* Capabilities */}
@@ -201,73 +148,51 @@ export function LoginPage() {
           </div>
         </section>
 
-        {/* Sign in */}
+        {/* Get started */}
         <section id="signin" className="scroll-mt-6">
           <div className="bg-white text-gray-800 rounded-2xl shadow-2xl p-8 max-w-md mx-auto">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold">Get started</h2>
               <p className="text-gray-600 mt-1">
-                {isDemoMode ? 'Jump right in — your progress is saved on this device.' : 'Sign in to save sessions and history across devices.'}
+                {isDemoMode
+                  ? 'Enter your email to start. Your progress is saved on this device.'
+                  : 'Enter your email and start right away. We’ll email you a sign-in link — tap it anytime to save your progress to your account and sync across devices.'}
               </p>
             </div>
 
-            {!isDemoMode && (
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="michael@example.com"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
-                    disabled={isLoading}
-                  />
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="michael@example.com"
+                  autoComplete="email"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+                  {error}
                 </div>
-
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
-                    {error}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors"
-                >
-                  {isLoading ? 'Loading...' : 'Send Magic Link'}
-                </button>
-
-                <p className="text-center text-gray-500 text-sm">
-                  No password needed! We'll send you a magic link to sign in.
-                </p>
-              </form>
-            )}
-
-            {/* Demo Mode Button */}
-            <div className={!isDemoMode ? 'mt-6 pt-6 border-t border-gray-200' : ''}>
-              {!isDemoMode && (
-                <p className="text-center text-gray-500 text-sm mb-4">Or try without an account</p>
               )}
+
               <button
-                onClick={handleDemoMode}
-                disabled={isLoading}
-                className={`w-full font-bold py-4 px-6 rounded-lg text-lg transition-colors ${
-                  isDemoMode
-                    ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white'
-                    : 'bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700'
-                }`}
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition-colors"
               >
-                {isLoading ? 'Loading...' : isDemoMode ? 'Start Demo' : 'Try Demo Mode'}
+                Start practicing →
               </button>
-              <p className="text-center text-gray-400 text-xs mt-2">
-                Demo data is saved locally in your browser
+
+              <p className="text-center text-gray-500 text-sm">
+                No password needed — you're in instantly.
               </p>
-            </div>
+            </form>
           </div>
         </section>
 

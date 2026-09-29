@@ -69,6 +69,15 @@ export function updateLocalSession(sessionId: string, updates: Partial<Session>)
   return sessions[index];
 }
 
+// Remove a session and all of its questions from local storage — used after
+// they have been migrated into the backend account.
+export function removeLocalSession(sessionId: string): void {
+  const sessions = getLocalSessions().filter(s => s.id !== sessionId);
+  localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+  const questions = getLocalQuestions().filter(q => q.sessionId !== sessionId);
+  localStorage.setItem(STORAGE_KEYS.QUESTIONS, JSON.stringify(questions));
+}
+
 // Question helpers
 export function getLocalQuestions(): Question[] {
   const data = localStorage.getItem(STORAGE_KEYS.QUESTIONS);

@@ -99,11 +99,15 @@ function mapSessionRow(data: Record<string, unknown>): Session {
   };
 }
 
-export async function createSession(session: Omit<Session, 'id' | 'startedAt' | 'totalCorrect' | 'totalAttempted'>): Promise<Session | null> {
+export async function createSession(
+  // startedAt is optional so migrated local sessions keep their original date.
+  session: Omit<Session, 'id' | 'startedAt' | 'totalCorrect' | 'totalAttempted'> & { startedAt?: Date }
+): Promise<Session | null> {
   const { data, error } = await supabase
     .from('sessions')
     .insert({
       user_id: session.userId,
+      started_at: session.startedAt?.toISOString(),
       theme: session.theme,
       custom_theme: session.customTheme,
       grade_level: session.gradeLevel,
