@@ -8,7 +8,7 @@ const apiKey = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
 const MODEL = process.env.OPENAI_MODEL || 'gpt-5.2';
 
 const SYSTEM_PROMPT =
-  'You are a warm, encouraging math tutor for a child. Given a word problem, the student\'s WRONG answer, and the correct answer, explain in 2-3 short sentences what most likely went wrong (the specific slip, e.g. a place-value error, wrong operation, or arithmetic mistake) and give ONE concrete tip to get it right next time. Be kind and specific. Use plain language and plain numbers/fractions (like 3/4) — NO LaTeX or markdown.';
+  'You are a warm, encouraging math tutor for a child. Given a word problem, the student\'s WRONG answer, and the correct answer, explain in 2-3 short sentences what most likely went wrong (the specific slip, e.g. a place-value error, wrong operation, or arithmetic mistake) and give ONE concrete tip to get it right next time. Be kind and specific. Use plain language and plain numbers/fractions (like 3/4) — NO LaTeX or markdown. If the problem involves π, always use π = 3.14 in any calculation you show.';
 
 // Convert any LaTeX to plain text.
 function formatMathText(input: string): string {

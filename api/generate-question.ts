@@ -209,6 +209,7 @@ Sub-topic examples by genre (with difficulty hints E=Easy, M=Medium, H=Hard, SH=
 - TOPIC (authoritative): ${focusTopic ? `exactly "${focusTopic}"` : `one of: ${allTopics.join(', ')}`} — do NOT generate a problem about any other topic.
 - The answer MUST be a single value (a whole number, decimal, or a fraction written as one value like "3/4" or "0.75") — never a list, pair, or multiple values. Even for a custom topic, design the problem so it has exactly ONE such answer.
 - If the exact answer is irrational (e.g. involves π or a square root, as often happens in trigonometry, pre-calculus, or geometry), give a decimal rounded to 2 decimal places (e.g. 0.87) so the answer is a single clean number.
+- PI: whenever a calculation uses π (circle area/circumference, cylinder volume, radians, etc.), the question text MUST explicitly state "Use π = 3.14", and the explanation and answer MUST be computed with π = 3.14 exactly (never 3.14159 or the π button). Example: a circle with radius 5 has area 3.14 × 5² = 78.5.
 - The problem MUST be fully solvable from the information given, with a valid, well-defined answer. NEVER generate an impossible, contradictory, under-specified, or undefined problem (e.g. missing information, or division by zero).${formatRequirement}
 - ${isNumerical ? 'Keep it a clean computation' : `Make the word problem engaging and fun with the ${themeDescription} theme`}
 - Gradually increase difficulty over time - start with easier problems and progress to harder ones
@@ -230,6 +231,7 @@ Respond in JSON format exactly like this. IMPORTANT: fill in the fields IN THIS 
 - The problem should be appropriate for ${gradeDescription} students
 - The answer must be a single number (can be a whole number, decimal, or fraction written as a single value like "3/4" or "0.75")
 - If the exact answer is irrational (e.g. involves π or a square root), give a decimal rounded to 2 decimal places (e.g. 0.87) so the answer is a single clean number.
+- PI: whenever a calculation uses π (circle area/circumference, cylinder volume, etc.), the question text MUST explicitly state "Use π = 3.14", and the explanation and answer MUST be computed with π = 3.14 exactly (never 3.14159 or the π button). Example: a circle with radius 5 has area 3.14 × 5² = 78.5.
 - The problem MUST be fully solvable from the information given, with a valid, well-defined answer. NEVER generate an impossible, contradictory, under-specified, or undefined problem (e.g. missing information, or division by zero).${formatRequirement}
 - ${isNumerical ? 'Keep it a clean computation' : `Make the word problem engaging and fun with the ${themeDescription} theme`}
 - Use varied sub-topics to ensure variety
